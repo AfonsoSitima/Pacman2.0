@@ -10,6 +10,8 @@
 #define LOAD_BACKUP 3
 #define CREATE_BACKUP 4
 
+//OLA
+
 void screen_refresh(board_t * game_board, int mode) {
     debug("REFRESH\n");
     draw_board(game_board, mode);
