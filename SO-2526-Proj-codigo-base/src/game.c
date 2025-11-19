@@ -102,28 +102,20 @@ void handle_files(DIR* dirStream){
         }
 
         //decidir se se adiciona verificação para saltar os ficheiros com nome . e .. (pq isso o case já faz)
-
+        //talvez criar sitio para guardar vários níveis (cada nível é guardado na struct board_t)
         //case para saber que função deve ler
         //caso seja .lvl
-        //caso seja .m ou .p
+        // quando se ler o .lvl é que se vai procurar os .p e .m correspondentes;
         char *extension = strchr(dp->d_name, '.'); //file extension
         if(strcmp(extension, ".lvl")){
-            //função de parse para lvl
+            //função de parse para lvl -> que por sua vez vai dar chamar o parse dos monstros e pac;
             //nestas funções passar a struct dirent para poder dar open;
-            continue;
-        }
-        else if(strcmp(extension, ".m")){
-            //função de parse para monstro
-            continue;
-        }
-        else if(strcmp(extension, ".p")){
-            //função de parse para pacman 
-            //a função para o pacman e monstros pode ser igual 
-            //(talvez adicionar flag para distinguir a struct a usar)
             continue;
         }
 
     }
+
+
     if(errno != 0){
         perror("readdir");
         closedir(dirStream);
