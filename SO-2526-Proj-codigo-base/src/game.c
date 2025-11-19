@@ -84,15 +84,64 @@ DIR* handle_input(char* level_directory) {
 
     if(!dir){
         perror("opendir");
-        return 1;
+        //ver o que fazer aqui
     }
     
     return dir;
 }   
 
-//não sei qual deve ser o output da função
-void handle_files(DIR* dirStream){
+board_t* parseLvl(struct dirent *dp){
+    //novo nível
+    board_t *lvl = (board_t*)malloc(sizeof(board_t));
+
+    int fd = open(dp->d_name, O_RDONLY);
+    if(fd == -1){
+        perror("openfile LevelFile");
+        //se o programa acabar aqui o que tem de se ter em conta? close's?
+    }
+
+    //utilizar lseek para 
+
+
+    close(fd); //close level file
+    return lvl;
+}
+
+ghost_t* parseMonster(char* fileName){
+    ghost_t *monster = (ghost_t*)malloc(sizeof(ghost_t));
+
+    int fd = open(fileName, O_RDONLY);
+    if(fd == -1){
+        perror("openfile MonsterFile");
+        //ver o que é preciso dar close aqui que vinha para trás;
+    }
+
+    //lógica
+    
+    close(fd); //close mosnter file
+    return monster;
+}
+
+pacman_t* parsePacman(char* fileName){
+    pacman_t *pacman = (pacman_t*)malloc(sizeof(pacman_t));
+
+    int fd = open(fileName, O_RDONLY);
+    if(fd == -1){
+        perror("openfile PacmanFile");
+        //ver o que pode ser preciso fechar para trás;
+    }
+
+    //lógica
+
+    close(fd); //close pacman file
+    return pacman;
+}
+
+//retornar lista de níveis
+board_t** handle_files(DIR* dirStream){
     struct dirent *dp;
+    board_t **levels = NULL; //array de ponteiros com todos os níveis que vão ser lidos
+    int numLevels = 0;
 
     for(;;){ //iterate thru all files in dir
         errno = 0;
@@ -109,23 +158,32 @@ void handle_files(DIR* dirStream){
         char *extension = strchr(dp->d_name, '.'); //file extension
         if(strcmp(extension, ".lvl")){
             //função de parse para lvl -> que por sua vez vai dar chamar o parse dos monstros e pac;
-            //nestas funções passar a struct dirent para poder dar open;
-            continue;
+            //dar realloc à estrutura de níveis cada vez que se cria um novo
+            
+            board_t **tempLevels = realloc(levels, (numLevels + 1) * sizeof(board_t*));
+            if(tempLevels){
+                perror("realloc");
+                //ver o que fazer aqui
+            }
+            levels = tempLevels; //realoc to original array;
+            levels[numLevels] = parseLvl(dp);
+            numLevels++; //novo nível
         }
 
     }
-
-
     if(errno != 0){
         perror("readdir");
         closedir(dirStream);
-        return 1;
+        //ver o que fazer aqui
     }
 
     closedir(dirStream); //é preciso verificar se close foi feito com sucesso?
 
-    return 0;
+    return levels;
 }
+
+
+
 
 int main(int argc, char** argv) {
     if (argc != 2) {
@@ -143,7 +201,8 @@ int main(int argc, char** argv) {
     
     int accumulated_points = 0;
     bool end_game = false;
-    board_t game_board; //aqui colocar função de parse para recolher os file inputs
+    board_t game_board; //meter função que devolve lista de níveis
+    //contador dentro do loop que vai passando de nível quando é suposto
 
     while (!end_game) {
         load_level(&game_board, accumulated_points);

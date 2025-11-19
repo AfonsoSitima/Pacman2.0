@@ -8,7 +8,7 @@ SRC_DIR = src
 OBJ_DIR = obj
 BIN_DIR = bin
 INCLUDE_DIR = include
-
+LEVEL_DIR = levels
 # executable 
 TARGET = Pacmanist
 
@@ -37,7 +37,7 @@ $(BIN_DIR)/$(TARGET): $(OBJS) | folders
 
 # run the program
 run: pacmanist
-	@./$(BIN_DIR)/$(TARGET)
+	@./$(BIN_DIR)/$(TARGET) $(LEVEL_DIR)
 
 # Create folders
 folders:
