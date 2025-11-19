@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <errno.h>
+#include <string.h>
 
 #define CONTINUE_PLAY 0
 #define NEXT_LEVEL 1
@@ -10,7 +14,7 @@
 #define LOAD_BACKUP 3
 #define CREATE_BACKUP 4
 
-//OLA
+
 
 void screen_refresh(board_t * game_board, int mode) {
     debug("REFRESH\n");
@@ -69,10 +73,73 @@ int play_board(board_t * game_board) {
     return CONTINUE_PLAY;  
 }
 
+
+/*
+* Opens the directory given
+* @param level_directory path of the directory given in argv
+* @return pointer to the dir stream;
+*/
+DIR* handle_input(char* level_directory) {
+    DIR *dir = opendir(level_directory);
+
+    if(!dir){
+        perror("opendir");
+        return 1;
+    }
+    
+    return dir;
+}   
+
+//não sei qual deve ser o output da função
+void handle_files(DIR* dirStream){
+    struct dirent *dp;
+
+    for(;;){ //iterate thru all files in dir
+        errno = 0;
+        dp = readdir(dirStream);
+        if(dp == NULL) {
+            break;
+        }
+
+        //decidir se se adiciona verificação para saltar os ficheiros com nome . e .. (pq isso o case já faz)
+
+        //case para saber que função deve ler
+        //caso seja .lvl
+        //caso seja .m ou .p
+        char *extension = strchr(dp->d_name, '.'); //file extension
+        if(strcmp(extension, ".lvl")){
+            //função de parse para lvl
+            //nestas funções passar a struct dirent para poder dar open;
+            continue;
+        }
+        else if(strcmp(extension, ".m")){
+            //função de parse para monstro
+            continue;
+        }
+        else if(strcmp(extension, ".p")){
+            //função de parse para pacman 
+            //a função para o pacman e monstros pode ser igual 
+            //(talvez adicionar flag para distinguir a struct a usar)
+            continue;
+        }
+
+    }
+    if(errno != 0){
+        perror("readdir");
+        closedir(dirStream);
+        return 1;
+    }
+
+    closedir(dirStream); //é preciso verificar se close foi feito com sucesso?
+
+    return 0;
+}
+
 int main(int argc, char** argv) {
     if (argc != 2) {
         printf("Usage: %s <level_directory>\n", argv[0]);
         // TODO receive inputs
+        handle_input(argv[1]); //recebe o diretório dos níveis
     }
 
     // Random seed for any random movements
@@ -84,7 +151,7 @@ int main(int argc, char** argv) {
     
     int accumulated_points = 0;
     bool end_game = false;
-    board_t game_board;
+    board_t game_board; //aqui colocar função de parse para recolher os file inputs
 
     while (!end_game) {
         load_level(&game_board, accumulated_points);
