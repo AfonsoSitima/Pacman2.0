@@ -13,6 +13,7 @@
 #define QUIT_GAME 2
 #define LOAD_BACKUP 3
 #define CREATE_BACKUP 4
+#define PATH_MAX 512 // o chat sugeriu este valor
 
 
 
@@ -90,19 +91,80 @@ DIR* handle_input(char* level_directory) {
     return dir;
 }   
 
-board_t* parseLvl(char* filename){ //pela forma que estamos a fazer no handle_files
-    //novo nível
-    board_t *lvl = (board_t*)malloc(sizeof(board_t));
 
-    int fd = open(filename, O_RDONLY);
+//USAR MAIS ESTA FUNÇÃO PARA LER FICHEIROS
+char* readFile(int fd, ssize_t* byte_count) { //talvez adicionar o numero de bytes lidos
+    char* buffer = NULL;
     if(fd == -1){
         perror("openfile LevelFile");
         //se o programa acabar aqui o que tem de se ter em conta? close's?
         //temos que criar função para dar free a tudo :(
     }
 
+    off_t size = lseek(fd, 0, SEEK_END); //get size of file
+    if (size == -1){
+        perror("lseek");
+        //ver o que fechar
+    }
 
-    //utilizar lseek para 
+    if (lseek(fd, 0, SEEK_SET) == -1) { //reset file offset to beginning
+        perror("lseek");
+    }
+    
+    buffer = malloc(size + 1);
+    if(!buffer){
+        perror("malloc");
+        //ver o que fechar
+    }
+
+    size_t total = 0;
+    while (total < size) {  //fazemos isto em loop porque é boa prática e garantir que lemos tudo
+        ssize_t bytesRead = read(fd, buffer, size - total);
+        if (bytesRead == -1) {
+            perror("read");
+            free(buffer);
+            //ver o que fechar
+            return NULL;
+        }
+        if (bytesRead == 0) {
+            break; // EOF
+        }
+        total += bytesRead;
+    }
+    buffer[total] = '\0'; // null-terminate the string
+    *byte_count = total;
+    return buffer;
+}
+
+
+
+
+
+board_t* parseLvl(char* filename){ //pela forma que estamos a fazer no handle_files
+    //novo nível
+    char* buffer = NULL;
+    char** lines = NULL;
+    char* line = NULL;
+    ssize_t byte_count = 0;
+    int line_count = 0;
+    board_t *lvl = (board_t*)malloc(sizeof(board_t));
+    size_t size_board;
+
+    int fd = open(filename, O_RDONLY);
+
+    buffer = readFile(fd, &byte_count);
+
+    lines = malloc(sizeof(char*) * (byte_count + 1)); //alocar espaço para as linhas (suposição de tamanho máximo)
+    line = strtok(buffer, "\n"); //separar por linhas
+    while (line != NULL) {
+        lines[line_count++] = line; //guardar cada linha no array
+        line = strtok(NULL, "\n");  
+    }
+
+    for (int i = 0; i < line_count; i++) {
+
+    }
+
 
     //criar cena para procurar os ficheiros .p e .m correspondentes ao nível
 
@@ -174,7 +236,7 @@ board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil cons
             //função de parse para lvl -> que por sua vez vai dar chamar o parse dos monstros e pac;
             //dar realloc à estrutura de níveis cada vez que se cria um novo
             
-            char path[512];
+            char path[PATH_MAX];
             snprintf(path, sizeof(path), "%s/%s", dirpath, dp->d_name); //construir o path completo
             //não sei se podemos fazer isto ja que snprintf é do stdio.h
 
