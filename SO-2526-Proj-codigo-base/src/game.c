@@ -90,17 +90,21 @@ DIR* handle_input(char* level_directory) {
     return dir;
 }   
 
-board_t* parseLvl(struct dirent *dp){
+board_t* parseLvl(char* filename){ //pela forma que estamos a fazer no handle_files
     //novo nível
     board_t *lvl = (board_t*)malloc(sizeof(board_t));
 
-    int fd = open(dp->d_name, O_RDONLY);
+    int fd = open(filename, O_RDONLY);
     if(fd == -1){
         perror("openfile LevelFile");
         //se o programa acabar aqui o que tem de se ter em conta? close's?
+        //temos que criar função para dar free a tudo :(
     }
 
+
     //utilizar lseek para 
+
+    //criar cena para procurar os ficheiros .p e .m correspondentes ao nível
 
 
     close(fd); //close level file
@@ -138,10 +142,17 @@ pacman_t* parsePacman(char* fileName){
 }
 
 //retornar lista de níveis
-board_t** handle_files(DIR* dirStream){
+board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil construir os paths
+    DIR *dirStream;   
     struct dirent *dp;
     board_t **levels = NULL; //array de ponteiros com todos os níveis que vão ser lidos
     int numLevels = 0;
+
+    dirStream = opendir(dirpath);  //abrir isto aqui dentro para ter mais controlo
+    if (dirStream == NULL) {
+        errMsg("opendir failed on '%s'", dirpath);  //copiei isto do prof
+        return;
+    }
 
     for(;;){ //iterate thru all files in dir
         errno = 0;
@@ -150,23 +161,30 @@ board_t** handle_files(DIR* dirStream){
             break;
         }
 
+        if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
+            continue; 
+
         //decidir se se adiciona verificação para saltar os ficheiros com nome . e .. (pq isso o case já faz)
         //talvez criar sitio para guardar vários níveis (cada nível é guardado na struct board_t)
         //case para saber que função deve ler
         //caso seja .lvl
         // quando se ler o .lvl é que se vai procurar os .p e .m correspondentes;
         char *extension = strchr(dp->d_name, '.'); //file extension
-        if(strcmp(extension, ".lvl")){
+        if(strcmp(extension, ".lvl") == 0){
             //função de parse para lvl -> que por sua vez vai dar chamar o parse dos monstros e pac;
             //dar realloc à estrutura de níveis cada vez que se cria um novo
             
-            board_t **tempLevels = realloc(levels, (numLevels + 1) * sizeof(board_t*));
+            char path[512];
+            snprintf(path, sizeof(path), "%s/%s", dirpath, dp->d_name); //construir o path completo
+            //não sei se podemos fazer isto ja que snprintf é do stdio.h
+
+            board_t **tempLevels = realloc(levels, (numLevels + 1) * sizeof(board_t*));  //talvez mudar isto porque é lento (pela minha exp de iaed)
             if(tempLevels){
                 perror("realloc");
                 //ver o que fazer aqui
             }
             levels = tempLevels; //realoc to original array;
-            levels[numLevels] = parseLvl(dp);
+            levels[numLevels] = parseLvl(path);
             numLevels++; //novo nível
         }
 
