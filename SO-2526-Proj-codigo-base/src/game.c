@@ -139,7 +139,7 @@ char* readFile(int fd, ssize_t* byte_count) { //talvez adicionar o numero de byt
 
 
 
-
+//VER SE HÁ MALLOC ERRORS AQUI
 board_t* parseLvl(char* filename){ //pela forma que estamos a fazer no handle_files
     //novo nível
     char* buffer = NULL;
@@ -147,7 +147,7 @@ board_t* parseLvl(char* filename){ //pela forma que estamos a fazer no handle_fi
     char* line = NULL;
     ssize_t byte_count = 0;
     int line_count = 0;
-    board_t *lvl = (board_t*)malloc(sizeof(board_t));
+    board_t *lvl = (board_t*)malloc(sizeof(board_t));  //ver se há malloc error
     size_t size_board;
 
     int fd = open(filename, O_RDONLY);
@@ -161,7 +161,45 @@ board_t* parseLvl(char* filename){ //pela forma que estamos a fazer no handle_fi
         line = strtok(NULL, "\n");  
     }
 
+    strcpy(lvl->level_name ,filename); //inicializar o nome do nível
+    lvl->n_pacmans = 0; //não sei se pode haver mais que 1 pacman
+    lvl->n_ghosts = 0;
+    lvl->pacmans = NULL;
+    lvl->ghosts = NULL;
+    //Ya bro não sei se esta é a melhor solução
+    //aqui tamos a ler linha por linha
     for (int i = 0; i < line_count; i++) {
+        if (strncmp(lines[i], "DIM", 3) == 0) 
+            sscanf(lines[i], "DIM %d %d", &lvl->width, &lvl->height);
+        
+        else if (strncmp(lines[i], "TEMPO", 5) == 0) 
+            sscanf(lines[i], "TEMPO %d", &lvl->tempo);
+        
+        else if (strncmp(lines[i], "PAC", 3) == 0) { 
+            sscanf(lines[i], "PAC %s", lvl->pacman_file);
+            lvl->pacmans = realloc(lvl->pacmans, (lvl->n_pacmans + 1) * sizeof(pacman_t));
+            lvl->pacmans[0] = *parsePacman(lvl->pacman_file); //ver se há malloc error aqui
+            lvl->n_pacmans++; //não tenho a certeza se é suposto haver mais que 1 pacman
+        }
+        
+        else if (strncmp(lines[i], "MON", 3) == 0) {
+            char ghost_files[256 * MAX_GHOSTS]; //array para guardar os nomes dos ficheiros (como está na struct board_t)
+            char *ghost_file;
+            
+            strcpy(ghost_files, lines[i] + 4); //ignorar o "MON "
+            ghost_file = strtok(ghost_files, " ");
+
+            while (ghost_file != NULL) {
+                lvl->ghosts = realloc(lvl->ghosts, (lvl->n_ghosts + 1) * sizeof(ghost_t));
+                lvl->ghosts[lvl->n_ghosts] = *parseMonster(ghost_file); //ver isto
+                strcpy(lvl->ghosts_files[lvl->n_ghosts++], ghost_file);
+                ghost_file = strtok(NULL, " ");
+            }
+        }   
+        else {
+            
+
+        }
 
     }
 
