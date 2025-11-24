@@ -117,8 +117,8 @@ char* readFile(int fd, ssize_t* byte_count) { //talvez adicionar o numero de byt
         //ver o que fechar
     }
 
-    size_t total = 0;
-    while (total < size) {  //fazemos isto em loop porque é boa prática e garantir que lemos tudo
+    ssize_t total = 0;
+    while (total < (ssize_t) size) {  //fazemos isto em loop porque é boa prática e garantir que lemos tudo
         ssize_t bytesRead = read(fd, buffer, size - total);
         if (bytesRead == -1) {
             perror("read");
