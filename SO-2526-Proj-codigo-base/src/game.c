@@ -15,6 +15,7 @@
 #define CREATE_BACKUP 4
 #define PATH_MAX 512 // o chat sugeriu este valor
 
+bool hasBackUp = false;
 
 
 void screen_refresh(board_t * game_board, int mode) {
@@ -48,6 +49,13 @@ int play_board(board_t * game_board) {
 
     if (play->command == 'Q') {
         return QUIT_GAME;
+    }
+
+    if(play->command == 'G'){
+        if(!(hasBackUp)){
+            hasBackUp = true;
+            return CREATE_BACKUP; //Manda sinal para criar backup
+        }   
     }
 
     int result = move_pacman(game_board, 0, play);
@@ -300,8 +308,56 @@ board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil cons
     return levels;
 }
 
+//rever os argumentos passados; 
+void createBackup(bool end_game, board_t game_board, int accumulated_points){
+    pid_t pid;
+    pid = fork();
 
+    //erro 
 
+    //handle
+    if(pid == 0){
+        gameLoop(end_game, game_board, accumulated_points);
+    }else{
+        //código pai
+    }
+}
+
+void gameLoop(bool end_game, board_t game_board, int accumulated_points){
+    while (!end_game) {
+        load_level(&game_board, accumulated_points);
+        draw_board(&game_board, DRAW_MENU);
+        refresh_screen();
+
+        while(true) {
+            int result = play_board(&game_board); 
+
+            if(result == NEXT_LEVEL) {
+                screen_refresh(&game_board, DRAW_WIN);
+                sleep_ms(game_board.tempo);
+                break;
+            }
+
+            if(result == CREATE_BACKUP){
+                createBackup(end_game, game_board, accumulated_points);
+            }
+
+            if(result == QUIT_GAME) {
+                screen_refresh(&game_board, DRAW_GAME_OVER); 
+                sleep_ms(game_board.tempo);
+                end_game = true;
+                break;
+            }
+    
+            screen_refresh(&game_board, DRAW_MENU); 
+
+            accumulated_points = game_board.pacmans[0].points;      
+        }
+        print_board(&game_board);
+        unload_level(&game_board);
+    }    
+
+}
 
 int main(int argc, char** argv) {
     if (argc != 2) {
@@ -322,34 +378,8 @@ int main(int argc, char** argv) {
     board_t game_board; //meter função que devolve lista de níveis
     //contador dentro do loop que vai passando de nível quando é suposto
 
-    while (!end_game) {
-        load_level(&game_board, accumulated_points);
-        draw_board(&game_board, DRAW_MENU);
-        refresh_screen();
+    createBackup(end_game, game_board, accumulated_points); //ver por causa do contador de levels
 
-        while(true) {
-            int result = play_board(&game_board); 
-
-            if(result == NEXT_LEVEL) {
-                screen_refresh(&game_board, DRAW_WIN);
-                sleep_ms(game_board.tempo);
-                break;
-            }
-
-            if(result == QUIT_GAME) {
-                screen_refresh(&game_board, DRAW_GAME_OVER); 
-                sleep_ms(game_board.tempo);
-                end_game = true;
-                break;
-            }
-    
-            screen_refresh(&game_board, DRAW_MENU); 
-
-            accumulated_points = game_board.pacmans[0].points;      
-        }
-        print_board(&game_board);
-        unload_level(&game_board);
-    }    
 
     terminal_cleanup();
 
