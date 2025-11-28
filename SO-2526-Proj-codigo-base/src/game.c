@@ -132,7 +132,7 @@ DIR* handle_input(char* level_directory) {
     return dir;
 }   
 
-/*
+
 //USAR MAIS ESTA FUNÇÃO PARA LER FICHEIROS
 char* readFile(int fd, ssize_t* byte_count) { //talvez adicionar o numero de bytes lidos
     char* buffer = NULL;
@@ -177,7 +177,7 @@ char* readFile(int fd, ssize_t* byte_count) { //talvez adicionar o numero de byt
     return buffer;
 }
 
-char* getBufferLines(char* buffer, ssize_t byte_count, int* line_count){
+char** getBufferLines(char* buffer, ssize_t byte_count, int* line_count){
     char** lines = malloc(sizeof(char*) * (byte_count + 1)); //alocar espaço para as linhas (suposição de tamanho máximo)
     char* line = strtok(buffer, "\n"); //separar por linhas
     while (line != NULL) {
@@ -187,18 +187,97 @@ char* getBufferLines(char* buffer, ssize_t byte_count, int* line_count){
     return lines;
 }
 
+ghost_t* parseMonster(char* filename){ //flag para distinguir se é monstro ou pacman
+    ghost_t *monster = NULL;
+    char* buffer = NULL;
+    char** lines = NULL;
+    ssize_t byte_count = 0;
+    int line_count = 0;
+
+    int fd = open(filename, O_RDONLY);
+
+    buffer = readFile(fd, &byte_count);
+
+    lines = getBufferLines(buffer, byte_count, &line_count);
+
+    monster = (ghost_t*)malloc(sizeof(ghost_t));
+    monster->charged = false;
+    monster->waiting = 0;
+    monster->n_moves = 0;
+    monster->current_move = 0;
+    for(int i = 0; i < line_count; i++) {
+        if (strncmp(lines[i], "PASSO", 5) == 0) {
+            sscanf(lines[i], "PASSO %d", &monster->passo);
+        }
+        else if(strncmp(lines[i], "POS", 3) == 0) {
+            sscanf(lines[i], "POS %d %d", &monster->pos_x, &monster->pos_y);
+        }
+        else if(strncmp(lines[i], "#", 1) == 0) {
+            continue;
+        }
+        else {
+            sscanf(lines[i], "%c%d", &monster->moves[monster->n_moves].command, &monster->moves[monster->n_moves].turns_left);
+            monster->n_moves++;
+        }
+    }
+
+    free(lines);
+    free(buffer);
+    close(fd); //close mosnter file
+    return monster;
+}
+
+pacman_t* parsePacman(char* filename){
+    pacman_t *pacman = NULL;
+    char* buffer = NULL;
+    char** lines = NULL;
+    ssize_t byte_count = 0;
+    int line_count = 0;
+
+    int fd = open(filename, O_RDONLY);
+
+    buffer = readFile(fd, &byte_count);
+
+    lines = getBufferLines(buffer, byte_count, &line_count);
+
+    pacman = (pacman_t*)malloc(sizeof(pacman_t));
+    pacman->alive = true;
+    pacman->points = 0;
+    pacman->waiting = 0;
+    pacman->n_moves = 0;
+    pacman->current_move = 0;
+    for(int i = 0; i < line_count; i++) {
+        if (strncmp(lines[i], "PASSO", 5) == 0) {
+            sscanf(lines[i], "PASSO %d", &pacman->passo);
+        }
+        else if(strncmp(lines[i], "POS", 3) == 0) {
+            sscanf(lines[i], "POS %d %d", &pacman->pos_x, &pacman->pos_y);
+        }
+        else if(strncmp(lines[i], "#", 1) == 0) {
+            continue;
+        }
+        else {
+            sscanf(lines[i], "%c%d", &pacman->moves[pacman->n_moves].command, &pacman->moves[pacman->n_moves].turns_left);
+            pacman->n_moves++;
+        }
+    }
+
+    free(lines);
+    free(buffer);
+    close(fd); //close mosnter file
+    return pacman;
+}
+
 
 //VER SE HÁ MALLOC ERRORS AQUI
 board_t* parseLvl(char* filename){ //pela forma que estamos a fazer no handle_files
     //novo nível
     char* buffer = NULL;
     char** lines = NULL;
-    char* line = NULL;
     ssize_t byte_count = 0;
     int line_count = 0;
     int matrix_index = 0;
     board_t *lvl = NULL;  //ver se há malloc error
-    size_t size_board;
 
     int fd = open(filename, O_RDONLY);
 
@@ -264,89 +343,6 @@ board_t* parseLvl(char* filename){ //pela forma que estamos a fazer no handle_fi
     return lvl;
 }
 
-ghost_t* parseMonster(char* filename){ //flag para distinguir se é monstro ou pacman
-    ghost_t *monster = NULL;
-    char* buffer = NULL;
-    char** lines = NULL;
-    char* line = NULL;
-    ssize_t byte_count = 0;
-    int line_count = 0;
-
-    int fd = open(filename, O_RDONLY);
-
-    buffer = readFile(fd, &byte_count);
-
-    lines = getBufferLines(buffer, byte_count, &line_count);
-
-    monster = (ghost_t*)malloc(sizeof(ghost_t));
-    monster->charged = false;
-    monster->waiting = 0;
-    monster->n_moves = 0;
-    monster->current_move = 0;
-    for(int i = 0; i < line_count; i++) {
-        if (strncmp(lines[i], "PASSO", 5) == 0) {
-            sscanf(lines[i], "PASSO %d", &monster->passo);
-        }
-        else if(strncmp(lines[i], "POS", 3) == 0) {
-            sscanf(lines[i], "POS %d %d", &monster->pos_x, &monster->pos_y);
-        }
-        else if(strncmp(lines[i], "#", 1) == 0) {
-            continue;
-        }
-        else {
-            sscanf(lines[i], "%c%d", &monster->moves[monster->n_moves].command, &monster->moves[monster->n_moves].turns_left);
-            monster->n_moves++;
-        }
-    }
-
-    free(lines);
-    free(buffer);
-    close(fd); //close mosnter file
-    return monster;
-}
-
-pacman_t* parsePacman(char* filename){
-    pacman_t *pacman = NULL;
-    char* buffer = NULL;
-    char** lines = NULL;
-    char* line = NULL;
-    ssize_t byte_count = 0;
-    int line_count = 0;
-
-    int fd = open(filename, O_RDONLY);
-
-    buffer = readFile(fd, &byte_count);
-
-    lines = getBufferLines(buffer, byte_count, &line_count);
-
-    pacman = (ghost_t*)malloc(sizeof(ghost_t));
-    pacman->alive = true;
-    pacman->points = 0;
-    pacman->waiting = 0;
-    pacman->n_moves = 0;
-    pacman->current_move = 0;
-    for(int i = 0; i < line_count; i++) {
-        if (strncmp(lines[i], "PASSO", 5) == 0) {
-            sscanf(lines[i], "PASSO %d", &pacman->passo);
-        }
-        else if(strncmp(lines[i], "POS", 3) == 0) {
-            sscanf(lines[i], "POS %d %d", &pacman->pos_x, &pacman->pos_y);
-        }
-        else if(strncmp(lines[i], "#", 1) == 0) {
-            continue;
-        }
-        else {
-            sscanf(lines[i], "%c%d", &pacman->moves[pacman->n_moves].command, &pacman->moves[pacman->n_moves].turns_left);
-            pacman->n_moves++;
-        }
-    }
-
-    free(lines);
-    free(buffer);
-    close(fd); //close mosnter file
-    return pacman;
-}
-
 
 //retornar lista de níveis
 board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil construir os paths
@@ -357,8 +353,8 @@ board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil cons
 
     dirStream = opendir(dirpath);  //abrir isto aqui dentro para ter mais controlo
     if (dirStream == NULL) {
-        errMsg("opendir failed on '%s'", dirpath);  //copiei isto do prof
-        return;
+        //perror("opendir failed on '%s'", dirpath);  //copiei isto do prof
+        //dar frreeeeee
     }
     for(;;){ //iterate thru all files in dir
         errno = 0;
@@ -405,7 +401,7 @@ board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil cons
 
     return levels;
 }
-*/
+
 
 int main(int argc, char** argv) {
     if (argc != 2) {
