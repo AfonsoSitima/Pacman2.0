@@ -7,13 +7,14 @@
 #include <dirent.h>
 #include <errno.h>
 #include <string.h>
+#include <sys/wait.h>
 
 #define CONTINUE_PLAY 0
 #define NEXT_LEVEL 1
 #define QUIT_GAME 2
 #define LOAD_BACKUP 3
 #define CREATE_BACKUP 4
-#define PATH_MAX 512 // o chat sugeriu este valor
+#define PATH_MAX 512
 #define PACMAN 1
 #define GHOST 2
 
@@ -49,15 +50,15 @@ int play_board(board_t * game_board) {
 
     debug("KEY %c\n", play->command);
 
-    if (play->command == 'Q') {
-        return QUIT_GAME;
+    if (play->command == 'G'){
+        if(!hasBackUp){
+            return CREATE_BACKUP;
+        }
+        
     }
 
-    if(play->command == 'G'){
-        if(!(hasBackUp)){
-            hasBackUp = true;
-            return CREATE_BACKUP; //Manda sinal para criar backup
-        }   
+    if (play->command == 'Q') {
+        return QUIT_GAME;
     }
 
     int result = move_pacman(game_board, 0, play);
@@ -69,6 +70,7 @@ int play_board(board_t * game_board) {
     if(result == DEAD_PACMAN) {
         return QUIT_GAME;
     }
+        
     
     for (int i = 0; i < game_board->n_ghosts; i++) {
         ghost_t* ghost = &game_board->ghosts[i];
@@ -83,6 +85,35 @@ int play_board(board_t * game_board) {
 
     return CONTINUE_PLAY;  
 }
+
+
+
+
+void createBackup(){
+    pid_t pid;
+    int status;
+
+    terminal_cleanup();
+    pid = fork();
+    if(pid == -1){
+        perror("Fork Error");
+        //falta os frees
+    }
+    hasBackUp = true;
+    if(pid == 0){
+        //executa o que o pai estava a executar
+        //frees e terminal_cleanup()
+        terminal_init();
+    }else{
+        wait(&status); 
+        terminal_init();
+        hasBackUp = false;
+
+    }
+}
+
+
+
 
 
 /*
@@ -381,27 +412,28 @@ board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil cons
     return levels;
 }
 
-//rever os argumentos passados; 
-void createBackup(bool end_game, board_t game_board, int accumulated_points){
-    pid_t pid;
-    pid = fork();
-
-    //erro 
-
-    //handle
-    if(pid == 0){
-        gameLoop(end_game, game_board, accumulated_points);
-    }else{
-        //código pai
+int main(int argc, char** argv) {
+    if (argc != 2) {
+        printf("Usage: %s <level_directory>\n", argv[0]);
+        // TODO receive inputs
     }
-}
 
-void gameLoop(bool end_game, board_t game_board, int accumulated_points){
+    // Random seed for any random movements
+    srand((unsigned int)time(NULL));
+
+    open_debug_file("debug.log");
+
+    terminal_init();
+    
+    int accumulated_points = 0;
+    bool end_game = false;
+    board_t game_board; //meter função que devolve lista de níveis
+    //contador dentro do loop que vai passando de nível quando é suposto
     while (!end_game) {
         load_level(&game_board, accumulated_points);
         draw_board(&game_board, DRAW_MENU);
         refresh_screen();
-
+        
         while(true) {
             int result = play_board(&game_board); 
 
@@ -410,10 +442,11 @@ void gameLoop(bool end_game, board_t game_board, int accumulated_points){
                 sleep_ms(game_board.tempo);
                 break;
             }
-
+            
             if(result == CREATE_BACKUP){
-                createBackup(end_game, game_board, accumulated_points);
+                createBackup();
             }
+
 
             if(result == QUIT_GAME) {
                 screen_refresh(&game_board, DRAW_GAME_OVER); 
@@ -428,31 +461,7 @@ void gameLoop(bool end_game, board_t game_board, int accumulated_points){
         }
         print_board(&game_board);
         unload_level(&game_board);
-    }    
-
-}
-
-int main(int argc, char** argv) {
-    if (argc != 2) {
-        printf("Usage: %s <level_directory>\n", argv[0]);
-        // TODO receive inputs
-        handle_input(argv[1]); //recebe o diretório dos níveis
-    }
-
-    // Random seed for any random movements
-    srand((unsigned int)time(NULL));
-
-    open_debug_file("debug.log");
-
-    terminal_init();
-    
-    int accumulated_points = 0;
-    bool end_game = false;
-    board_t game_board; //meter função que devolve lista de níveis
-    //contador dentro do loop que vai passando de nível quando é suposto
-
-    createBackup(end_game, game_board, accumulated_points); //ver por causa do contador de levels
-
+    }     
 
     terminal_cleanup();
 
