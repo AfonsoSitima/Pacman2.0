@@ -132,7 +132,7 @@ DIR* handle_input(char* level_directory) {
     return dir;
 }   
 
-
+/*
 //USAR MAIS ESTA FUNÇÃO PARA LER FICHEIROS
 char* readFile(int fd, ssize_t* byte_count) { //talvez adicionar o numero de bytes lidos
     char* buffer = NULL;
@@ -205,12 +205,6 @@ board_t* parseLvl(char* filename){ //pela forma que estamos a fazer no handle_fi
     buffer = readFile(fd, &byte_count);
 
     lines = getBufferLines(buffer, byte_count, &line_count);
-    /*lines = malloc(sizeof(char*) * (byte_count + 1)); //alocar espaço para as linhas (suposição de tamanho máximo)
-    line = strtok(buffer, "\n"); //separar por linhas
-    while (line != NULL) {
-        lines[line_count++] = line; //guardar cada linha no array
-        line = strtok(NULL, "\n");  
-    }*/
 
     lvl = (board_t*)malloc(sizeof(board_t));  //ver se há malloc error
     strcpy(lvl->level_name ,filename); //inicializar o nome do nível
@@ -411,6 +405,7 @@ board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil cons
 
     return levels;
 }
+*/
 
 int main(int argc, char** argv) {
     if (argc != 2) {
