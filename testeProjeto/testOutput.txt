@@ -1,0 +1,77 @@
+-----levels/3.lvl-----
+Width : 5 ; Height : 5
+XXXXX
+XoooX
+Xo@oX
+XooXo
+XXXXX
+
+-----PACMANS-----
+
+Nº pacmans : 1
+POSX: 5 ; POSY: 5
+Alive: 1
+PASSO: 3
+Moves: T5; W; T5; S; T5; 
+Current_Move: 0
+Moves: 5
+
+-----GHOSTS-----
+Nº ghosts : 1
+--GHOST 1--
+POSX: 3 ; POSY: 2
+Passo: 5
+Moves: T10; C; T5; A; 
+Nº Moves: 4
+Curr Move: 0
+
+--FILE INFO--
+Filename : levels/3.lvl
+Pac File : 3.p
+Ghost Files : 5.m
+Time : 20
+
+-----END LEVEL: levels/3.lvl-----
+
+
+-----levels/2.lvl-----
+Width : 10 ; Height : 10
+XXXXXXXXXX
+Xooooooo@X
+XoXoXXoXoX
+XoXoXXoXoX
+XoXooooooX
+XoXXoXXoXX
+XoXooooXoX
+XoXoXXoXoX
+XoooooooXo
+XXXXXXXXXX
+
+-----PACMANS-----
+
+Nº pacmans : 1
+POSX: 1 ; POSY: 1
+Alive: 1
+PASSO: 1
+Moves: D; D; D; D; S; A; A; A; A; S; 
+Current_Move: 0
+Moves: 10
+
+-----GHOSTS-----
+Nº ghosts : 1
+--GHOST 1--
+POSX: 8 ; POSY: 8
+Passo: 1
+Moves: R; R; R; R; R; T3; 
+Nº Moves: 6
+Curr Move: 0
+
+--FILE INFO--
+Filename : levels/2.lvl
+Pac File : 2.p
+Ghost Files : 4.m
+Time : 5
+
+-----END LEVEL: levels/2.lvl-----
+
+
