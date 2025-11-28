@@ -14,8 +14,8 @@
 #define QUIT_GAME 2
 #define LOAD_BACKUP 3
 #define CREATE_BACKUP 4
-#define PATH_MAX 512 // o chat sugeriu este valor
 
+bool hasBackUp = false;
 
 
 void screen_refresh(board_t * game_board, int mode) {
@@ -47,6 +47,13 @@ int play_board(board_t * game_board) {
 
     debug("KEY %c\n", play->command);
 
+    if (play->command == 'G'){
+        if(!hasBackUp){
+            return CREATE_BACKUP;
+        }
+        
+    }
+
     if (play->command == 'Q') {
         return QUIT_GAME;
     }
@@ -75,8 +82,21 @@ int play_board(board_t * game_board) {
     return CONTINUE_PLAY;  
 }
 
+void createBackup(){
+    pid_t pid;
+    int status;
 
+    pid = fork();
+    if(pid == -1){
+        perror("Fork Error");
+    }
+    
+    if(pid == 0){
 
+    }else{
+        wait(&status);
+    }
+}
 
 
 
@@ -112,6 +132,10 @@ int main(int argc, char** argv) {
                 sleep_ms(game_board.tempo);
                 break;
             }
+            
+            if(result == CREATE_BACKUP){
+                createBackup();
+            }
 
             if(result == QUIT_GAME) {
                 screen_refresh(&game_board, DRAW_GAME_OVER); 
@@ -126,7 +150,7 @@ int main(int argc, char** argv) {
         }
         print_board(&game_board);
         unload_level(&game_board);
-    }    
+    }     
 
     terminal_cleanup();
 
