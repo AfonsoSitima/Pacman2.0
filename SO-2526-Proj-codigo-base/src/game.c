@@ -67,6 +67,7 @@ int play_board(board_t * game_board) {
     if(result == DEAD_PACMAN) {
         return QUIT_GAME;
     }
+        
     
     for (int i = 0; i < game_board->n_ghosts; i++) {
         ghost_t* ghost = &game_board->ghosts[i];
@@ -82,19 +83,30 @@ int play_board(board_t * game_board) {
     return CONTINUE_PLAY;  
 }
 
+void loadBackup(){
+    //recuperar o estado do ncurses
+    //preciso de verificar o erro ?
+    reset_prog_mode();
+    refresh_screen();
+}
+
 void createBackup(){
     pid_t pid;
     int status;
 
+    def_prog_mode();
+    terminal_cleanup();
     pid = fork();
     if(pid == -1){
         perror("Fork Error");
     }
     
     if(pid == 0){
-
+        //executa o que o pai estava a executar
     }else{
         wait(&status);
+        loadBackup();
+
     }
 }
 
@@ -123,7 +135,7 @@ int main(int argc, char** argv) {
         load_level(&game_board, accumulated_points);
         draw_board(&game_board, DRAW_MENU);
         refresh_screen();
-
+        
         while(true) {
             int result = play_board(&game_board); 
 
@@ -136,6 +148,7 @@ int main(int argc, char** argv) {
             if(result == CREATE_BACKUP){
                 createBackup();
             }
+
 
             if(result == QUIT_GAME) {
                 screen_refresh(&game_board, DRAW_GAME_OVER); 
