@@ -83,29 +83,28 @@ int play_board(board_t * game_board) {
     return CONTINUE_PLAY;  
 }
 
-void loadBackup(){
-    //recuperar o estado do ncurses
-    //preciso de verificar o erro ?
-    reset_prog_mode();
-    refresh_screen();
-}
+
+
 
 void createBackup(){
     pid_t pid;
     int status;
 
-    def_prog_mode();
     terminal_cleanup();
     pid = fork();
     if(pid == -1){
         perror("Fork Error");
+        //falta os frees
     }
-    
+    hasBackUp = true;
     if(pid == 0){
         //executa o que o pai estava a executar
+        //frees e terminal_cleanup()
+        terminal_init();
     }else{
-        wait(&status);
-        loadBackup();
+        wait(&status); 
+        terminal_init();
+        hasBackUp = false;
 
     }
 }
