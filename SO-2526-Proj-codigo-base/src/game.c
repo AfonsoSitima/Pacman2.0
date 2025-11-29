@@ -113,27 +113,6 @@ void createBackup(){
 }
 
 
-
-
-
-/*
-* Opens the directory given
-* @param level_directory path of the directory given in argv
-* @return pointer to the dir stream;
-*/
-DIR* handle_input(char* level_directory) {
-    DIR *dir = opendir(level_directory);
-
-    if(!dir){
-        perror("opendir");
-        //ver o que fazer aqui
-    }
-    
-    return dir;
-}   
-
-
-//USAR MAIS ESTA FUNÇÃO PARA LER FICHEIROS
 char* readFile(int fd, ssize_t* byte_count) { //talvez adicionar o numero de bytes lidos
     char* buffer = NULL;
     if(fd == -1){
@@ -187,14 +166,16 @@ char** getBufferLines(char* buffer, ssize_t byte_count, int* line_count){
     return lines;
 }
 
-ghost_t* parseMonster(char* filename){ //flag para distinguir se é monstro ou pacman
+ghost_t* parseMonster(char* filename, char* dirpath){ 
     ghost_t *monster = NULL;
     char* buffer = NULL;
     char** lines = NULL;
     ssize_t byte_count = 0;
     int line_count = 0;
 
-    int fd = open(filename, O_RDONLY);
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "%s/%s", dirpath, filename); //construir o path completo
+    int fd = open(path, O_RDONLY);
 
     buffer = readFile(fd, &byte_count);
 
@@ -227,14 +208,17 @@ ghost_t* parseMonster(char* filename){ //flag para distinguir se é monstro ou p
     return monster;
 }
 
-pacman_t* parsePacman(char* filename){
+pacman_t* parsePacman(char* filename, char* dirpath){
     pacman_t *pacman = NULL;
     char* buffer = NULL;
     char** lines = NULL;
     ssize_t byte_count = 0;
     int line_count = 0;
 
-    int fd = open(filename, O_RDONLY);
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "%s/%s", dirpath, filename); //construir o path completo
+
+    int fd = open(path, O_RDONLY);
 
     buffer = readFile(fd, &byte_count);
 
@@ -270,7 +254,7 @@ pacman_t* parsePacman(char* filename){
 
 
 //VER SE HÁ MALLOC ERRORS AQUI
-board_t* parseLvl(char* filename){ //pela forma que estamos a fazer no handle_files
+board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a fazer no handle_files
     //novo nível
     char* buffer = NULL;
     char** lines = NULL;
@@ -278,13 +262,13 @@ board_t* parseLvl(char* filename){ //pela forma que estamos a fazer no handle_fi
     int line_count = 0;
     int matrix_index = 0;
     board_t *lvl = NULL;  //ver se há malloc error
-
+    
     int fd = open(filename, O_RDONLY);
-
+    
     buffer = readFile(fd, &byte_count);
-
+    
     lines = getBufferLines(buffer, byte_count, &line_count);
-
+   
     lvl = (board_t*)malloc(sizeof(board_t));  //ver se há malloc error
     strcpy(lvl->level_name ,filename); //inicializar o nome do nível
     lvl->n_pacmans = 0; //não sei se pode haver mais que 1 pacman
@@ -305,24 +289,36 @@ board_t* parseLvl(char* filename){ //pela forma que estamos a fazer no handle_fi
         else if (strncmp(lines[i], "PAC", 3) == 0) { 
             sscanf(lines[i], "PAC %s", lvl->pacman_file);
             lvl->pacmans = realloc(lvl->pacmans, (lvl->n_pacmans + 1) * sizeof(pacman_t));
-            lvl->pacmans[0] = *parsePacman(lvl->pacman_file); //ver se há malloc error aqui
+            lvl->pacmans[0] = *parsePacman(lvl->pacman_file, dirpath); //ver se há malloc error aqui
             lvl->n_pacmans++; //não tenho a certeza se é suposto haver mais que 1 pacman
         }
         
         else if (strncmp(lines[i], "MON", 3) == 0) {
-            char ghost_files[256 * MAX_GHOSTS]; //array para guardar os nomes dos ficheiros (como está na struct board_t)
+            char ghost_files[256 * MAX_GHOSTS];
             char *ghost_file;
-            
-            strcpy(ghost_files, lines[i] + 4); //ignorar o "MON "
-            ghost_file = strtok(ghost_files, " ");
+            char *saveptr;                // estado da strtok_r
+
+            strcpy(ghost_files, lines[i] + 4);   // ignorar o "MON "
+
+            ghost_file = strtok_r(ghost_files, " ", &saveptr);
 
             while (ghost_file != NULL) {
                 lvl->ghosts = realloc(lvl->ghosts, (lvl->n_ghosts + 1) * sizeof(ghost_t));
-                lvl->ghosts[lvl->n_ghosts] = *parseMonster(ghost_file); //ver isto
-                strcpy(lvl->ghosts_files[lvl->n_ghosts++], ghost_file);
-                ghost_file = strtok(NULL, " ");
+
+                if (!lvl->ghosts) {
+                    // trata erro de memória se quiseres
+                    break;
+                }
+
+
+                lvl->ghosts[lvl->n_ghosts] = *parseMonster(ghost_file, dirpath);
+
+                strcpy(lvl->ghosts_files[lvl->n_ghosts], ghost_file);
+                lvl->n_ghosts++;
+
+                ghost_file = strtok_r(NULL, " ", &saveptr);
             }
-        }    
+        }   
         else if (strncmp(lines[i], "#", 1) == 0) {
             continue;
         }
@@ -353,6 +349,7 @@ board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil cons
 
     dirStream = opendir(dirpath);  //abrir isto aqui dentro para ter mais controlo
     if (dirStream == NULL) {
+        perror("Open dir falhou");
         //perror("opendir failed on '%s'", dirpath);  //copiei isto do prof
         //dar frreeeeee
     }
@@ -371,7 +368,7 @@ board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil cons
         //case para saber que função deve ler
         //caso seja .lvl
         // quando se ler o .lvl é que se vai procurar os .p e .m correspondentes;
-        char *extension = strchr(dp->d_name, '.'); //file extension
+        char *extension = strchr(dp->d_name, '.'); //file extension    
         if(strcmp(extension, ".lvl") == 0){
             //função de parse para lvl -> que por sua vez vai dar chamar o parse dos monstros e pac;
             //dar realloc à estrutura de níveis cada vez que se cria um novo
@@ -379,14 +376,13 @@ board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil cons
             char path[PATH_MAX];
             snprintf(path, sizeof(path), "%s/%s", dirpath, dp->d_name); //construir o path completo
             //não sei se podemos fazer isto ja que snprintf é do stdio.h
-
             board_t **tempLevels = realloc(levels, (numLevels + 1) * sizeof(board_t*));  //talvez mudar isto porque é lento (pela minha exp de iaed)
-            if(tempLevels){
+            if(!tempLevels){
                 perror("realloc");
                 //ver o que fazer aqui
             }
             levels = tempLevels; //realoc to original array;
-            levels[numLevels] = parseLvl(path);
+            levels[numLevels] = parseLvl(path, dirpath);
             numLevels++; //novo nível
         }
 
@@ -403,6 +399,7 @@ board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil cons
 }
 
 
+
 int main(int argc, char** argv) {
     if (argc != 2) {
         printf("Usage: %s <level_directory>\n", argv[0]);
@@ -416,12 +413,16 @@ int main(int argc, char** argv) {
 
     terminal_init();
     
+    int current_level = 0;
     int accumulated_points = 0;
     bool end_game = false;
-    board_t game_board; //meter função que devolve lista de níveis
+
+    board_t** levels = handle_files(argv[1]);
     //contador dentro do loop que vai passando de nível quando é suposto
     while (!end_game) {
-        load_level(&game_board, accumulated_points);
+        printf("A");
+        board_t game_board = *levels[current_level];
+        load_level(&game_board, accumulated_points); //NO NOVO MÉTODO TEM DE ACUMULAR PONTOS
         draw_board(&game_board, DRAW_MENU);
         refresh_screen();
         
@@ -449,11 +450,12 @@ int main(int argc, char** argv) {
             screen_refresh(&game_board, DRAW_MENU); 
 
             accumulated_points = game_board.pacmans[0].points;      
+            current_level++;
         }
         print_board(&game_board);
         unload_level(&game_board);
-    }     
-
+        
+    }
     terminal_cleanup();
 
     close_debug_file();

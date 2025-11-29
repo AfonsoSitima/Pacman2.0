@@ -334,88 +334,41 @@ void kill_pacman(board_t* board, int pacman_index) {
 
 // Static Loading
 int load_pacman(board_t* board, int points) {
-    board->board[1 * board->width + 1].content = 'P'; // Pacman
-    board->pacmans[0].pos_x = 1;
-    board->pacmans[0].pos_y = 1;
-    board->pacmans[0].alive = 1;
     board->pacmans[0].points = points;
     return 0;
 }
 
-// Static Loading
-int load_ghost(board_t* board) {
-    // Ghost 0
-    board->board[3 * board->width + 1].content = 'M'; // Monster
-    board->ghosts[0].pos_x = 1;
-    board->ghosts[0].pos_y = 3;
-    board->ghosts[0].passo = 0;
-    board->ghosts[0].waiting = 0;
-    board->ghosts[0].current_move = 0;
-    board->ghosts[0].n_moves = 16;
-    for (int i = 0; i < 8; i++) {
-        board->ghosts[0].moves[i].command = 'D';
-        board->ghosts[0].moves[i].turns = 1; 
-    }
-    for (int i = 8; i < 16; i++) {
-        board->ghosts[0].moves[i].command = 'A';
-        board->ghosts[0].moves[i].turns = 1; 
-    }
 
-    // Ghost 1
-    board->board[2 * board->width + 4].content = 'M'; // Monster
-    board->ghosts[1].pos_x = 4;
-    board->ghosts[1].pos_y = 2;
-    board->ghosts[1].passo = 1;
-    board->ghosts[1].waiting = 1;
-    board->ghosts[1].current_move = 0;
-    board->ghosts[1].n_moves = 1;
-    board->ghosts[1].moves[0].command = 'R'; // Random
-    board->ghosts[1].moves[0].turns = 1; 
-    
-    return 0;
-}
 
 int load_level(board_t *board, int points) {
-    board->height = 5;
-    board->width = 10;
-    board->tempo = 10;
-
-    board->n_ghosts = 2;
-    board->n_pacmans = 1;
-
-    board->board = calloc(board->width * board->height, sizeof(board_pos_t));
-    board->pacmans = calloc(board->n_pacmans, sizeof(pacman_t));
-    board->ghosts = calloc(board->n_ghosts, sizeof(ghost_t));
-
-    sprintf(board->level_name, "Static Level");
-
-    for (int i = 0; i < board->height; i++) {
-        for (int j = 0; j < board->width; j++) {
-            if (i == 0 || j == 0 || j == (board->width - 1)) {
-                board->board[i * board->width + j].content = 'W';
-            }
-            else if (i == 4 && j == 8) {
-                board->board[i * board->width + j].content = ' ';
-                board->board[i * board->width + j].has_portal = 1;
-            }
-            else {
-                board->board[i * board->width + j].content = ' ';
-                board->board[i * board->width + j].has_dot = 1;
-            }
-        }
-    }
-
-    load_ghost(board);
     load_pacman(board, points);
-
     return 0;
 }
-
-void unload_level(board_t * board) {
-    free(board->board);
-    free(board->pacmans);
-    free(board->ghosts);
+//free pacman
+void freePac(pacman_t *pacman){
+    free(pacman);
 }
+//free ghost
+void freeGhost(ghost_t *ghost){
+    free(ghost); //adicionar free verifications?
+}
+
+//free level
+void freeLevel(board_t *level){
+    free(level->board); 
+    freePac(level->pacmans);
+    //free ghosts
+    for(int ghost = 0; ghost < level->n_ghosts; ghost++){
+        freeGhost(&level->ghosts[ghost]);
+    }
+    free(level);
+}
+void unload_level(board_t *level) {
+    freeLevel(level);
+    
+}
+
+
 
 void open_debug_file(char *filename) {
     debugfile = fopen(filename, "w");
