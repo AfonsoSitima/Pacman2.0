@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <stdio.h>
+
 #define CONTINUE_PLAY 0
 #define NEXT_LEVEL 1
 #define QUIT_GAME 2
@@ -24,7 +25,7 @@
 
 
 //USAR MAIS ESTA FUNÇÃO PARA LER FICHEIROS
-char* readFile(int fd, ssize_t* byte_count, char *filename) { //talvez adicionar o numero de bytes lidos
+char* readFile(int fd, ssize_t* byte_count) { //talvez adicionar o numero de bytes lidos
     char* buffer = NULL;
     if(fd == -1){
         perror("openfile LevelFile");
@@ -77,7 +78,7 @@ char** getBufferLines(char* buffer, ssize_t byte_count, int* line_count){
     return lines;
 }
 
-ghost_t* parseMonster(char* filename, char* dirpath){ //flag para distinguir se é monstro ou pacman
+ghost_t* parseMonster(char* filename, char* dirpath){ 
     ghost_t *monster = NULL;
     char* buffer = NULL;
     char** lines = NULL;
@@ -86,10 +87,9 @@ ghost_t* parseMonster(char* filename, char* dirpath){ //flag para distinguir se 
 
     char path[PATH_MAX];
     snprintf(path, sizeof(path), "%s/%s", dirpath, filename); //construir o path completo
-
     int fd = open(path, O_RDONLY);
 
-    buffer = readFile(fd, &byte_count, filename);
+    buffer = readFile(fd, &byte_count);
 
     lines = getBufferLines(buffer, byte_count, &line_count);
 
@@ -132,7 +132,7 @@ pacman_t* parsePacman(char* filename, char* dirpath){
 
     int fd = open(path, O_RDONLY);
 
-    buffer = readFile(fd, &byte_count, filename);
+    buffer = readFile(fd, &byte_count);
 
     lines = getBufferLines(buffer, byte_count, &line_count);
 
@@ -177,7 +177,7 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
     
     int fd = open(filename, O_RDONLY);
     
-    buffer = readFile(fd, &byte_count, filename);
+    buffer = readFile(fd, &byte_count);
     
     lines = getBufferLines(buffer, byte_count, &line_count);
    
@@ -206,19 +206,31 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
         }
         
         else if (strncmp(lines[i], "MON", 3) == 0) {
-            char ghost_files[256 * MAX_GHOSTS]; //array para guardar os nomes dos ficheiros (como está na struct board_t)
+            char ghost_files[256 * MAX_GHOSTS];
             char *ghost_file;
-            
-            strcpy(ghost_files, lines[i] + 4); //ignorar o "MON "
-            ghost_file = strtok(ghost_files, " ");
+            char *saveptr;                // estado da strtok_r
+
+            strcpy(ghost_files, lines[i] + 4);   // ignorar o "MON "
+
+            ghost_file = strtok_r(ghost_files, " ", &saveptr);
 
             while (ghost_file != NULL) {
                 lvl->ghosts = realloc(lvl->ghosts, (lvl->n_ghosts + 1) * sizeof(ghost_t));
-                lvl->ghosts[lvl->n_ghosts] = *parseMonster(ghost_file, dirpath); //ver isto
-                strcpy(lvl->ghosts_files[lvl->n_ghosts++], ghost_file);
-                ghost_file = strtok(NULL, " ");
+
+                if (!lvl->ghosts) {
+                    // trata erro de memória se quiseres
+                    break;
+                }
+
+
+                lvl->ghosts[lvl->n_ghosts] = *parseMonster(ghost_file, dirpath);
+
+                strcpy(lvl->ghosts_files[lvl->n_ghosts], ghost_file);
+                lvl->n_ghosts++;
+
+                ghost_file = strtok_r(NULL, " ", &saveptr);
             }
-        }    
+        }   
         else if (strncmp(lines[i], "#", 1) == 0) {
             continue;
         }
@@ -368,7 +380,7 @@ int main(){
         //O GHOST FILE É MATRIX
         fprintf(f, "Ghost Files : ");
         for(int ghostFile = 0; ghostFile < game[level]->n_ghosts; ghostFile++){
-            fprintf(f, "%s", game[level]->ghosts_files[ghostFile]);
+            fprintf(f, "%s ", game[level]->ghosts_files[ghostFile]);
         }
         fprintf(f, "\nTime : %d\n", game[level]->tempo);
         fprintf(f, "\n-----END LEVEL: %s-----\n\n\n", game[level]->level_name);
