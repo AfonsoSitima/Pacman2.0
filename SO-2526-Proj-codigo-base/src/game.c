@@ -35,7 +35,7 @@ int play_board(board_t * game_board) {
     if (pacman->n_moves == 0) { // if is user input
         command_t c; 
         c.command = get_input();
-
+        
         if(c.command == '\0')
             return CONTINUE_PLAY;
 
@@ -62,6 +62,7 @@ int play_board(board_t * game_board) {
     }
 
     int result = move_pacman(game_board, 0, play);
+    debug("%d\n", result);
     if (result == REACHED_PORTAL) {
         // Next level
         return NEXT_LEVEL;
@@ -405,7 +406,6 @@ int main(int argc, char** argv) {
         printf("Usage: %s <level_directory>\n", argv[0]);
         // TODO receive inputs
     }
-
     // Random seed for any random movements
     srand((unsigned int)time(NULL));
 
@@ -413,25 +413,35 @@ int main(int argc, char** argv) {
 
     terminal_init();
     
-    int current_level = 0;
+    int indexLevel = 0;
+    board_t *game_board = NULL;
     int accumulated_points = 0;
     bool end_game = false;
-
+    
     board_t** levels = handle_files(argv[1]);
-    //contador dentro do loop que vai passando de nível quando é suposto
+    
+    
     while (!end_game) {
-        printf("A");
-        board_t game_board = *levels[current_level];
-        load_level(&game_board, accumulated_points); //NO NOVO MÉTODO TEM DE ACUMULAR PONTOS
-        draw_board(&game_board, DRAW_MENU);
+
+        if (levels[indexLevel] == NULL) {
+            end_game = true;
+            break; 
+        }
+        game_board = levels[indexLevel];
+        
+        load_level(game_board, accumulated_points); //NO NOVO MÉTODO TEM DE ACUMULAR PONTOS
+
+        draw_board(game_board, DRAW_MENU);
+
         refresh_screen();
         
         while(true) {
-            int result = play_board(&game_board); 
+            int result = play_board(game_board); 
 
             if(result == NEXT_LEVEL) {
-                screen_refresh(&game_board, DRAW_WIN);
-                sleep_ms(game_board.tempo);
+                screen_refresh(game_board, DRAW_WIN);
+                sleep_ms(game_board->tempo);
+                indexLevel++;
                 break;
             }
             
@@ -441,21 +451,21 @@ int main(int argc, char** argv) {
 
 
             if(result == QUIT_GAME) {
-                screen_refresh(&game_board, DRAW_GAME_OVER); 
-                sleep_ms(game_board.tempo);
+                screen_refresh(game_board, DRAW_GAME_OVER); 
+                sleep_ms(game_board->tempo);
                 end_game = true;
                 break;
             }
     
-            screen_refresh(&game_board, DRAW_MENU); 
+            screen_refresh(game_board, DRAW_MENU); 
 
-            accumulated_points = game_board.pacmans[0].points;      
-            current_level++;
+            accumulated_points = game_board->pacmans[0].points;      
         }
-        print_board(&game_board);
-        unload_level(&game_board);
+        print_board(game_board);
+        unload_level(game_board);
         
     }
+    unload_allLevels(levels, indexLevel);
     terminal_cleanup();
 
     close_debug_file();

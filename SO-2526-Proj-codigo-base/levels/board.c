@@ -404,7 +404,7 @@ void unload_level(board_t *level) {
     
 }
 void unload_allLevels(board_t **levels, int currentLevel){
-    for(int level = currentLevel; levels[level]; level++){
+    for(int level = currentLevel + 1; levels[level]; level++){
         levels[level] = NULL;
     }
     free(levels);

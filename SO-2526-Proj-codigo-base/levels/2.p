@@ -1,7 +1,7 @@
 # PASSO: comando de espaçamento de movimentos
-PASSO 1
+PASSO 10
 # POS: comando de colocação inicial do Pac-Man (linha e coluna).
-POS 1 1
+POS 2 2
 # Movimento em ciclo
 D
 D

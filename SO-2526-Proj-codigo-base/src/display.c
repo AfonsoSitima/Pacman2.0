@@ -90,7 +90,7 @@ void draw_board(board_t* board, int mode) {
 
             // Draw with appropriate color
             switch (ch) {
-                case 'W': // Wall
+                case 'X': // Wall
                     attron(COLOR_PAIR(3));
                     addch('#');
                     attroff(COLOR_PAIR(3));
@@ -108,7 +108,7 @@ void draw_board(board_t* board, int mode) {
                     attroff((COLOR_PAIR(2) | A_BOLD) | ((ghost_charged) ? (A_DIM) : (0)));
                     break;
 
-                case ' ': // Empty space
+                case 'o': // Empty space
                     if (board->board[index].has_portal) {
                         attron(COLOR_PAIR(6));
                         addch('@');
@@ -133,8 +133,9 @@ void draw_board(board_t* board, int mode) {
     // Draw score/status at the bottom
     attron(COLOR_PAIR(5));
     mvprintw(start_row + board->height + 1, 0, "Points: %d",
-             board->pacmans[0].points); // Assuming first pacman for now
+           board->pacmans[0].points); // Assuming first pacman for now
     attroff(COLOR_PAIR(5));
+
 }
 
 void draw(char c, int colour_i, int pos_x, int pos_y) {
