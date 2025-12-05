@@ -14,7 +14,7 @@
 #define QUIT_GAME 2
 #define LOAD_BACKUP 3
 #define CREATE_BACKUP 4
-#define VICTORY 1
+#define END_GAME 1
 #define PATH_MAX 512
 #define PACMAN 1
 #define GHOST 2
@@ -68,7 +68,7 @@ int play_board(board_t * game_board, bool hasBackUp) {
     }
 
     if(result == DEAD_PACMAN) {
-        if (hasBackUp) return LOAD_BACKUP;
+        if (hasBackUp) return LOAD_BACKUP;  //só funciona se o hasBackUp for aqui idk y
         return QUIT_GAME;
     }
         
@@ -109,7 +109,7 @@ int createBackup(bool* hasBackUp) {
         if (WIFEXITED(status)) {                 // saiu normalmente
             int code = WEXITSTATUS(status);      // código do exit
             if (code == 0) {
-                return VICTORY;
+                return END_GAME;
             } 
             else if (code == 1) {
                 terminal_init();
@@ -454,7 +454,6 @@ int main(int argc, char** argv) {
             }
 
             if(result == LOAD_BACKUP) {
-                debug("FILHO MORRE ------------\n");
                 unload_allLevels(levels, indexLevel);
                 terminal_cleanup();
                 exit(1);  //o filho morre

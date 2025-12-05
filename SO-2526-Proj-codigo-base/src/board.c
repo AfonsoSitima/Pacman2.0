@@ -352,7 +352,6 @@ int findFirstFreeSpot(board_t* board){
 
 //Loading pacman points
 int load_pacman(board_t* board, int points) {
-
     if(!strcmp(board->pacman_file, "")){
         board->n_pacmans = 1;
         board->pacmans = (pacman_t*)calloc(board->n_pacmans, sizeof(pacman_t));
@@ -367,8 +366,10 @@ int load_pacman(board_t* board, int points) {
         free(pacman); //já não é necessário
 
     }else{
+
         board->board[get_board_index(board,board->pacmans[0].pos_x, board->pacmans[0].pos_y)].content = 'P'; // Pacman
         board->pacmans[0].points = points;
+        debug("No pacman file specified.----- %d%d\n", board->pacmans[0].pos_x, board->pacmans[0].pos_y);
     }
     //programa chega aqui
     return 0;
@@ -382,7 +383,6 @@ int load_ghost(board_t* board, ghost_t* ghost){
 }
 
 int load_level(board_t *board, int points) {
-
     load_pacman(board, points);
     for(int i = 0; i < board->n_ghosts; i++){
         load_ghost(board, &board->ghosts[i]);
