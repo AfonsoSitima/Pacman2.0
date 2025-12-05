@@ -10,6 +10,7 @@ BIN_DIR = bin
 INCLUDE_DIR = include
 # executable 
 TARGET = Pacmanist
+DIR_TARGET = levels
 
 # Objects variables
 OBJS = game.o display.o board.o
@@ -36,7 +37,7 @@ $(BIN_DIR)/$(TARGET): $(OBJS) | folders
 
 # run the program
 run: pacmanist
-	@./$(BIN_DIR)/$(TARGET)
+	@./$(BIN_DIR)/$(TARGET) $(DIR_TARGET)
 
 # Create folders
 folders:
