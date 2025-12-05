@@ -337,7 +337,7 @@ void kill_pacman(board_t* board, int pacman_index) {
 //aux 
 int findFirstFreeSpot(board_t* board){
     //ver caso n haja free spot ? 
-    int freeIndex;
+    int freeIndex = 0;
     for(int spot = 0; spot < (board->height * board->width) ; spot++){
         if(board->board[spot].content == 'o' && board->board[spot].has_dot){
             freeIndex = spot;

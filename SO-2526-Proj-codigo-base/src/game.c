@@ -14,11 +14,10 @@
 #define QUIT_GAME 2
 #define LOAD_BACKUP 3
 #define CREATE_BACKUP 4
+#define VICTORY 1
 #define PATH_MAX 512
 #define PACMAN 1
 #define GHOST 2
-
-bool hasBackUp = false;
 
 
 void screen_refresh(board_t * game_board, int mode) {
@@ -29,7 +28,7 @@ void screen_refresh(board_t * game_board, int mode) {
         sleep_ms(game_board->tempo);       
 }
 
-int play_board(board_t * game_board) {
+int play_board(board_t * game_board, bool hasBackUp) {
     pacman_t* pacman = &game_board->pacmans[0];
     command_t* play;
     if (pacman->n_moves == 0) { // if is user input
@@ -69,6 +68,7 @@ int play_board(board_t * game_board) {
     }
 
     if(result == DEAD_PACMAN) {
+        if (hasBackUp) return LOAD_BACKUP;
         return QUIT_GAME;
     }
         
@@ -79,10 +79,10 @@ int play_board(board_t * game_board) {
         // this ensures that we always access a valid move for the ghost
         move_ghost(game_board, i, &ghost->moves[ghost->current_move%ghost->n_moves]);
     }
-
     if (!game_board->pacmans[0].alive) {
+        if (hasBackUp) return LOAD_BACKUP;
         return QUIT_GAME;
-    }      
+    }      //NAO SEI SE ISTO É PRECISO AQUI
 
     return CONTINUE_PLAY;  
 }
@@ -90,7 +90,7 @@ int play_board(board_t * game_board) {
 
 
 
-void createBackup(){
+int createBackup(bool* hasBackUp) {
     pid_t pid;
     int status;
 
@@ -100,17 +100,24 @@ void createBackup(){
         perror("Fork Error");
         //falta os frees
     }
-    hasBackUp = true;
+    *hasBackUp = true;
     if(pid == 0){
-        //executa o que o pai estava a executar
-        //frees e terminal_cleanup()
         terminal_init();
-    }else{
-        wait(&status); 
-        terminal_init();
-        hasBackUp = false;
-
     }
+    else{
+        wait(&status); 
+        if (WIFEXITED(status)) {                 // saiu normalmente
+            int code = WEXITSTATUS(status);      // código do exit
+            if (code == 0) {
+                return VICTORY;
+            } 
+            else if (code == 1) {
+                terminal_init();
+                *hasBackUp = false;
+            }
+        }
+    }
+    return CONTINUE_PLAY;
 }
 
 
@@ -393,6 +400,7 @@ board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil cons
         closedir(dirStream);
         //ver o que fazer aqui
     }
+    levels = realloc(levels, (numLevels + 1) * sizeof(board_t*));
 
     closedir(dirStream); //é preciso verificar se close foi feito com sucesso?
 
@@ -417,6 +425,7 @@ int main(int argc, char** argv) {
     board_t *game_board = NULL;
     int accumulated_points = 0;
     bool end_game = false;
+    bool hasBackUp = false;
     
     board_t** levels = handle_files(argv[1]);
     
@@ -436,17 +445,23 @@ int main(int argc, char** argv) {
         refresh_screen();
         
         while(true) {
-            int result = play_board(game_board); 
-
+            int result = play_board(game_board, hasBackUp); 
             if(result == NEXT_LEVEL) {
                 screen_refresh(game_board, DRAW_WIN);
                 sleep_ms(game_board->tempo);
                 indexLevel++;
                 break;
             }
-            
+
+            if(result == LOAD_BACKUP) {
+                debug("FILHO MORRE ------------\n");
+                unload_allLevels(levels, indexLevel);
+                terminal_cleanup();
+                exit(1);  //o filho morre
+            }
+
             if(result == CREATE_BACKUP){
-                createBackup();
+                result = (createBackup(&hasBackUp) == 1) ? QUIT_GAME : CONTINUE_PLAY;
             }
 
 
