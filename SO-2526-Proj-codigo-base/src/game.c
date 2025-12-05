@@ -333,7 +333,7 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
         else {
             for(int j = 0; j < lvl->width; j++) {
                 if (lvl->board[matrix_index].content != 'P' && lvl->board[matrix_index].content != 'M') { //se já tiver sido inicializado por um pacman ou monstro, não sobrescrever
-                    lvl->board[matrix_index].content = lines[i][j];
+                    lvl->board[matrix_index].content = (lines[i][j] == '@') ? 'o' : lines[i][j]; //tratar portal como casa normal
                     lvl->board[matrix_index].has_dot = (lines[i][j] == 'o') ? true : false;
                     lvl->board[matrix_index].has_portal = (lines[i][j] == '@') ? true : false;
                 }
@@ -445,6 +445,8 @@ int main(int argc, char** argv) {
         refresh_screen();
         
         while(true) {
+            debug("PACS %d\n", game_board->n_pacmans);
+            debug("TABULEIRO %c\n", game_board->board[0]);
             int result = play_board(game_board, hasBackUp); 
             if(result == NEXT_LEVEL) {
                 screen_refresh(game_board, DRAW_WIN);
