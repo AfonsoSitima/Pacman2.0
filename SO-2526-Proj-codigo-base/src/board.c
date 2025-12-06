@@ -322,6 +322,23 @@ int move_ghost(board_t* board, int ghost_index, command_t* command) {
     return result;
 }
 
+
+//É obrigatório ter esta função
+//ver onde por locks
+void* ghost_thread(void* thread_data) {
+    int result = 1;
+    thread_ghost_t* data = (thread_ghost_t*)thread_data;
+    board_t* board = data->board;
+    int ghost_index = data->index; 
+    ghost_t* ghost = &board->ghosts[ghost_index];
+    while(result != DEAD_PACMAN) { //Arranjar forma de ver se o pacman entrou no portal
+        result = move_ghost(board, ghost_index, &ghost->moves[ghost->current_move % ghost->n_moves]);
+    }
+    return NULL;
+}
+
+
+
 void kill_pacman(board_t* board, int pacman_index) {
     debug("Killing %d pacman\n\n", pacman_index);
     pacman_t* pac = &board->pacmans[pacman_index];
