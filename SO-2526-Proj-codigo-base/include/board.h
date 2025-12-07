@@ -41,16 +41,10 @@ typedef struct {
 } ghost_t;
 
 typedef struct {
-    int index;
-    board_t* board;
-    ghost_t* ghost;
-    command_t* moves;
-} thread_ghost_t;
-
-typedef struct {
     char content;   // stuff like 'P' for pacman 'M' for monster/ghost and 'W' for wall
     int has_dot;    // whether there is a dot in this position or not
     int has_portal; // whether there is a portal in this position or not
+    pthread_mutex_t lock; //lock para cada casa
 } board_pos_t;
 
 typedef struct {
@@ -65,6 +59,13 @@ typedef struct {
     char ghosts_files[MAX_GHOSTS][256]; // files with monster movements
     int tempo;              // Duration of each play
 } board_t;
+
+typedef struct {
+    int index;
+    board_t* board;
+    ghost_t* ghost;
+    command_t* moves;
+} thread_ghost_t;
 
 /*Makes the current thread sleep for 'int milliseconds' miliseconds*/
 void sleep_ms(int milliseconds);

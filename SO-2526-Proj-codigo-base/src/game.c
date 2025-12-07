@@ -344,6 +344,9 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
         }
         else {
             for(int j = 0; j < lvl->width; j++) {
+                if(lines[i][j] != 'X'){ //iniciliazar mutex do portal?
+                    pthread_mutex_init(&lvl->board[matrix_index].lock, NULL); //desbloqueado
+                }
                 if (lvl->board[matrix_index].content != 'P' && lvl->board[matrix_index].content != 'M') { //se já tiver sido inicializado por um pacman ou monstro, não sobrescrever
                     lvl->board[matrix_index].content = (lines[i][j] == '@') ? 'o' : lines[i][j]; //tratar portal como casa normal
                     lvl->board[matrix_index].has_dot = (lines[i][j] == 'o') ? true : false;
@@ -425,7 +428,7 @@ void start_ghost_threads(board_t* board) {    //trata de todas a threads dos gho
         thread_ghost_t* thread_data = malloc(sizeof(thread_ghost_t));
         thread_data->index = i;
         thread_data->board = board;
-        thread_data->moves = &board->ghosts[i].moves;
+        thread_data->moves = board->ghosts[i].moves;
         pthread_create(&tid[i], NULL, (void*) ghost_thread, thread_data);
         free(thread_data);
     }

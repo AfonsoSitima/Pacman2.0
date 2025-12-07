@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <stdarg.h>
 #include <string.h>
+#include <pthread.h>
 FILE * debugfile;
 
 // Helper private function to find and kill pacman at specific position
@@ -305,11 +306,14 @@ int move_ghost(board_t* board, int ghost_index, command_t* command) {
     }
 
     int result = VALID_MOVE;
+    //lock nova casa
+    pthread_mutex_lock(&board->board[new_index].lock); //lock posição de destino
+
     // Check for pacman
     if (target_content == 'P') {
         result = find_and_kill_pacman(board, new_x, new_y);
     }
-
+    pthread_mutex_unlock(&board->board[old_index].lock); //lock posição de saída
     // Update board - clear old position (restore what was there)
     board->board[old_index].content = 'o'; // Or restore the dot if ghost was on one
 
@@ -325,6 +329,7 @@ int move_ghost(board_t* board, int ghost_index, command_t* command) {
 
 //É obrigatório ter esta função
 //ver onde por locks
+//thread a desbloquear a casa onde estava e a bloquear a casa para onde vai
 void* ghost_thread(void* thread_data) {
     int result = 1;
     thread_ghost_t* data = (thread_ghost_t*)thread_data;
@@ -411,7 +416,14 @@ int load_level(board_t *board, int points) {
 
 //free level
 void freeLevel(board_t *level){
-    if (level->board != NULL) free(level->board); 
+    if (level->board != NULL){
+        for(int i = 0; i < level->width * level->height; i++){
+            if(level->board[i].content != 'X'){ //apenas os X n tinha mutex inicializado
+                pthread_mutex_destroy(&level->board[i].lock);
+            }
+        }
+        free(level->board); 
+    }
     if (level->pacmans != NULL) free(level->pacmans);
     if (level->ghosts != NULL) free(level->ghosts);
     free(level);
