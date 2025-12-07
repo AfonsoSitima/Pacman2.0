@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <pthread.h>
 
 #define CONTINUE_PLAY 0
 #define NEXT_LEVEL 1
@@ -31,6 +32,7 @@ void screen_refresh(board_t * game_board, int mode) {
 int play_board(board_t * game_board, bool hasBackUp) {
     pacman_t* pacman = &game_board->pacmans[0];
     command_t* play;
+    pthread_t tid[game_board->n_ghosts];
     if (pacman->n_moves == 0) { // if is user input
         command_t c; 
         c.command = get_input();
@@ -73,12 +75,22 @@ int play_board(board_t * game_board, bool hasBackUp) {
     }
         
     
-    for (int i = 0; i < game_board->n_ghosts; i++) {
+    /*for (int i = 0; i < game_board->n_ghosts; i++) {
         ghost_t* ghost = &game_board->ghosts[i];
+        thread_ghost_t* thread_data = malloc(sizeof(thread_ghost_t));
+        thread_data->index = i;
+        thread_data->board = game_board;
+        thread_data->moves = &ghost->moves[ghost->current_move % ghost->n_moves];
+        pthread_create(&tid[i], NULL, (void*) ghost_thread, thread_data);
         // avoid buffer overflow wrapping around with modulo of n_moves
         // this ensures that we always access a valid move for the ghost
-        move_ghost(game_board, i, &ghost->moves[ghost->current_move%ghost->n_moves]);
+        //move_ghost(game_board, i, &ghost->moves[ghost->current_move%ghost->n_moves]);
+    }*/
+    
+    for (int i = 0; i < game_board->n_ghosts; i++) {
+        pthread_join(tid[i], NULL);
     }
+    
     if (!game_board->pacmans[0].alive) {
         if (hasBackUp) return LOAD_BACKUP;
         return QUIT_GAME;
@@ -407,7 +419,20 @@ board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil cons
     return levels;
 }
 
-
+void start_ghost_threads(board_t* board) {    //trata de todas a threads dos ghosts
+    pthread_t tid[board->n_ghosts];
+    for (int i = 0; i < board->n_ghosts; i++) {
+        thread_ghost_t* thread_data = malloc(sizeof(thread_ghost_t));
+        thread_data->index = i;
+        thread_data->board = board;
+        thread_data->moves = &board->ghosts[i].moves;
+        pthread_create(&tid[i], NULL, (void*) ghost_thread, thread_data);
+        free(thread_data);
+    }
+    for (int i = 0; i < board->n_ghosts; i++) {
+        pthread_join(tid[i], NULL);
+    }
+}
 
 int main(int argc, char** argv) {
     if (argc != 2) {
@@ -443,6 +468,8 @@ int main(int argc, char** argv) {
         draw_board(game_board, DRAW_MENU);
 
         refresh_screen();
+
+        start_ghost_threads(game_board); //talvez começar isto no load_level????
         
         while(true) {
             debug("PACS %d\n", game_board->n_pacmans);

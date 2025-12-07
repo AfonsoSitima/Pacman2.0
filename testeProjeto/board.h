@@ -41,6 +41,13 @@ typedef struct {
 } ghost_t;
 
 typedef struct {
+    int index;
+    board_t* board;
+    ghost_t* ghost;
+    command_t* moves;
+} thread_ghost_t;
+
+typedef struct {
     char content;   // stuff like 'P' for pacman 'M' for monster/ghost and 'W' for wall
     int has_dot;    // whether there is a dot in this position or not
     int has_portal; // whether there is a portal in this position or not
@@ -96,5 +103,7 @@ void debug(const char * format, ...);
 
 /*Writes the board and its contents to the open debug file*/
 void print_board(board_t* board);
+
+void* ghost_thread(void* arg);
 
 #endif
