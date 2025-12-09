@@ -1,5 +1,6 @@
 #include "board.h"
 #include "display.h"
+#include "game.h"
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
@@ -32,7 +33,6 @@ void screen_refresh(board_t * game_board, int mode) {
 int play_board(board_t * game_board, bool hasBackUp) {
     pacman_t* pacman = &game_board->pacmans[0];
     command_t* play;
-    pthread_t tid[game_board->n_ghosts];
     if (pacman->n_moves == 0) { // if is user input
         command_t c; 
         c.command = get_input();
@@ -87,9 +87,6 @@ int play_board(board_t * game_board, bool hasBackUp) {
         //move_ghost(game_board, i, &ghost->moves[ghost->current_move%ghost->n_moves]);
     }*/
     
-    for (int i = 0; i < game_board->n_ghosts; i++) {
-        pthread_join(tid[i], NULL);
-    }
     
     if (!game_board->pacmans[0].alive) {
         if (hasBackUp) return LOAD_BACKUP;
@@ -296,6 +293,9 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
     lvl->pacmans = NULL;
     lvl->ghosts = NULL;
     lvl->board = NULL;
+    lvl->tid = NULL;
+    lvl->ncursesDraw = DRAW_MENU; //inicial
+    lvl->levelControl = 0;
     //Ya bro não sei se esta é a melhor solução
     //aqui tamos a ler linha por linha
     for (int i = 0; i < line_count; i++) {
@@ -344,9 +344,8 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
         }
         else {
             for(int j = 0; j < lvl->width; j++) {
-                if(lines[i][j] != 'X'){ //iniciliazar mutex do portal?
-                    pthread_mutex_init(&lvl->board[matrix_index].lock, NULL); //desbloqueado
-                }
+                pthread_mutex_init(&lvl->board[matrix_index].lock, NULL); //desbloqueado
+                
                 if (lvl->board[matrix_index].content != 'P' && lvl->board[matrix_index].content != 'M') { //se já tiver sido inicializado por um pacman ou monstro, não sobrescrever
                     lvl->board[matrix_index].content = (lines[i][j] == '@') ? 'o' : lines[i][j]; //tratar portal como casa normal
                     lvl->board[matrix_index].has_dot = (lines[i][j] == 'o') ? true : false;
@@ -356,6 +355,9 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
             }
         }
     }
+    lvl->tid = malloc(sizeof(pthread_t) * lvl->n_ghosts); //array dos tids
+    pthread_mutex_init(&lvl->ncurses_lock, NULL); //lock do ncurses
+
     free(lines);
     free(buffer);
     close(fd); //close level file
@@ -423,21 +425,47 @@ board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil cons
 }
 
 void start_ghost_threads(board_t* board) {    //trata de todas a threads dos ghosts
-    pthread_t tid[board->n_ghosts];
     for (int i = 0; i < board->n_ghosts; i++) {
         thread_ghost_t* thread_data = malloc(sizeof(thread_ghost_t));
         thread_data->index = i;
         thread_data->board = board;
         thread_data->moves = board->ghosts[i].moves;
-        pthread_create(&tid[i], NULL, (void*) ghost_thread, thread_data);
-        free(thread_data);
-    }
-    for (int i = 0; i < board->n_ghosts; i++) {
-        pthread_join(tid[i], NULL);
+        pthread_create(&board->tid[i], NULL, (void*) ghost_thread, thread_data);
     }
 }
 
+void stop_ghost_threads(board_t* board){
+    for(int i = 0; i < board->n_ghosts ; i++){
+        pthread_join(board->tid[i], NULL);
+    }
+}
+
+void start_ncurses_thread(pthread_t* tid, thread_ncurses* ncurses_data){
+    pthread_create(tid, NULL, (void*)ncurses_thread, ncurses_data);
+}
+
+void* ncurses_thread(void* arg){
+    thread_ncurses* data = (thread_ncurses*)arg;
+
+    while(data->running && data->board->levelControl){
+        pthread_mutex_lock(&data->board->ncurses_lock);
+        
+        screen_refresh(data->board, data->board->ncursesDraw);
+
+        pthread_mutex_unlock(&data->board->ncurses_lock);
+    }
+    return NULL;
+}
+
+void stop_ncurses_thread(thread_ncurses* data, pthread_t tid){
+    data->running = 0;
+    pthread_join(tid, NULL);
+    free(data);
+}
+
+
 int main(int argc, char** argv) {
+    sleep(10); //para debug
     if (argc != 2) {
         printf("Usage: %s <level_directory>\n", argv[0]);
         // TODO receive inputs
@@ -446,9 +474,10 @@ int main(int argc, char** argv) {
     srand((unsigned int)time(NULL));
 
     open_debug_file("debug.log");
-
     terminal_init();
+
     
+
     int indexLevel = 0;
     board_t *game_board = NULL;
     int accumulated_points = 0;
@@ -468,23 +497,24 @@ int main(int argc, char** argv) {
         
         load_level(game_board, accumulated_points); //NO NOVO MÉTODO TEM DE ACUMULAR PONTOS
 
-        draw_board(game_board, DRAW_MENU);
 
-        refresh_screen();
-
+        pthread_t ncurses_tid;
+        thread_ncurses* ncurses_data = malloc(sizeof(thread_ncurses));
+        ncurses_data->board = game_board;
+        ncurses_data->running = 1;
+        start_ncurses_thread(&ncurses_tid, ncurses_data);
+        
         start_ghost_threads(game_board); //talvez começar isto no load_level????
         
         while(true) {
-            debug("PACS %d\n", game_board->n_pacmans);
-            debug("TABULEIRO %c\n", game_board->board[0]);
+
             int result = play_board(game_board, hasBackUp); 
             if(result == NEXT_LEVEL) {
-                screen_refresh(game_board, DRAW_WIN);
-                sleep_ms(game_board->tempo);
+                game_board->ncursesDraw = DRAW_WIN;
                 indexLevel++;
                 break;
             }
-
+            
             if(result == LOAD_BACKUP) {
                 unload_allLevels(levels, indexLevel);
                 terminal_cleanup();
@@ -494,26 +524,30 @@ int main(int argc, char** argv) {
             if(result == CREATE_BACKUP){
                 result = (createBackup(&hasBackUp) == 1) ? QUIT_GAME : CONTINUE_PLAY;
             }
-
+            
 
             if(result == QUIT_GAME) {
-                screen_refresh(game_board, DRAW_GAME_OVER); 
-                sleep_ms(game_board->tempo);
+                game_board->ncursesDraw = DRAW_GAME_OVER;
                 end_game = true;
                 break;
             }
     
-            screen_refresh(game_board, DRAW_MENU); 
+            game_board->ncursesDraw = DRAW_MENU;
 
             accumulated_points = game_board->pacmans[0].points;      
         }
+        game_board->levelControl = 0;
+        stop_ghost_threads(game_board);
+        stop_ncurses_thread(ncurses_data, ncurses_tid);
+        
+
         print_board(game_board);
         unload_level(game_board);
         
     }
     unload_allLevels(levels, indexLevel);
+    
     terminal_cleanup();
-
     close_debug_file();
 
     return 0;
