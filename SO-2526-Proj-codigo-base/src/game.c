@@ -250,6 +250,7 @@ pacman_t* parsePacman(char* filename, char* dirpath){
     pacman->waiting = 0;
     pacman->n_moves = 0;
     pacman->current_move = 0;
+    pacman->rwlock = PTHREAD_RWLOCK_INITIALIZER;
     for(int i = 0; i < line_count; i++) {
         if (strncmp(lines[i], "PASSO", 5) == 0) {
             sscanf(lines[i], "PASSO %d", &pacman->passo);
@@ -344,6 +345,7 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
         }
         else {
             for(int j = 0; j < lvl->width; j++) {
+                lvl->board[matrix_index].wrlock = PTHREAD_RWLOCK_INITIALIZER; 
                 if (lvl->board[matrix_index].content != 'P' && lvl->board[matrix_index].content != 'M') { //se já tiver sido inicializado por um pacman ou monstro, não sobrescrever
                     lvl->board[matrix_index].content = lines[i][j];
                     lvl->board[matrix_index].has_dot = (lines[i][j] == 'o') ? true : false;

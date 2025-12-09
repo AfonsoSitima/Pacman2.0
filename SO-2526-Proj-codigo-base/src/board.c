@@ -5,7 +5,25 @@
 #include <unistd.h>
 #include <stdarg.h>
 #include <string.h>
+#include <pthread.h>
 FILE * debugfile;
+
+
+void locksOrder(int new_index, int old_index, board_t* board){
+    if(new_index > old_index){
+        pthread_rwlock_wrlock(&board->board[new_index].lock); //lock posição de destino
+        pthread_rwlock_wrlock(&board->board[old_index].lock); //lock posição atual
+    }
+    else{
+        pthread_rwlock_wrlock(&board->board[old_index].lock); //lock posição atual
+        pthread_rwlock_wrlock(&board->board[new_index].lock); //lock posição de destino
+    }
+}
+
+void unlockOrder(int new_index, int old_index, board_t* board){
+    pthread_mutex_unlock(&board->board[old_index].lock); //lock posição de saída
+    pthread_mutex_unlock(&board->board[new_index].lock);
+}
 
 // Helper private function to find and kill pacman at specific position
 static int find_and_kill_pacman(board_t* board, int new_x, int new_y) {
@@ -97,22 +115,28 @@ int move_pacman(board_t* board, int pacman_index, command_t* command) {
 
     int new_index = get_board_index(board, new_x, new_y);
     int old_index = get_board_index(board, pac->pos_x, pac->pos_y);
+
+    locksOrder(new_index, old_index, board);
+
     char target_content = board->board[new_index].content;
 
     if (board->board[new_index].has_portal) {
         board->board[old_index].content = 'o';
         board->board[new_index].content = 'P';
+        unlockOrder(new_index, old_index, board);
         return REACHED_PORTAL;
     }
 
     // Check for walls
     if (target_content == 'X') {
+        unlockOrder(new_index, old_index, board);
         return INVALID_MOVE;
     }
 
     // Check for ghosts
     if (target_content == 'M') {
         kill_pacman(board, pacman_index);
+        unlockOrder(new_index, old_index, board);
         return DEAD_PACMAN;
     }
 
@@ -126,6 +150,7 @@ int move_pacman(board_t* board, int pacman_index, command_t* command) {
     pac->pos_x = new_x;
     pac->pos_y = new_y;
     board->board[new_index].content = 'P';
+    unlockOrder(new_index, old_index, board);
 
     return VALID_MOVE;
 }
@@ -205,6 +230,7 @@ static int move_ghost_charged_direction(board_t* board, ghost_t* ghost, char dir
             debug("DEFAULT CHARGED MOVE - direction = %c\n", direction);
             return INVALID_MOVE;
     }
+
     return VALID_MOVE;
 }   
 
@@ -216,15 +242,23 @@ int move_ghost_charged(board_t* board, int ghost_index, char direction) {
     int new_y = y;
 
     ghost->charged = 0; //uncharge
+
+    locksOrder(get_board_index(board, x, y), get_board_index(board, x, y), board);
+    
     int result = move_ghost_charged_direction(board, ghost, direction, &new_x, &new_y);
+
+    unlockOrder(get_board_index(board, x, y), get_board_index(board, x, y), board);
     if (result == INVALID_MOVE) {
         debug("DEFAULT CHARGED MOVE - direction = %c\n", direction);
         return INVALID_MOVE;
     }
 
+
     // Get board indices
     int old_index = get_board_index(board, ghost->pos_x, ghost->pos_y);
     int new_index = get_board_index(board, new_x, new_y);
+
+    locksOrder(new_index, old_index, board);
 
     // Update board - clear old position (restore what was there)
     board->board[old_index].content = 'o'; // Or restore the dot if ghost was on one
@@ -233,6 +267,9 @@ int move_ghost_charged(board_t* board, int ghost_index, char direction) {
     ghost->pos_y = new_y;
     // Update board - set new position
     board->board[new_index].content = 'M';
+
+    unlockOrder(new_index, old_index, board);
+
     return result;
 }
 
@@ -300,7 +337,10 @@ int move_ghost(board_t* board, int ghost_index, command_t* command) {
     char target_content = board->board[new_index].content;
 
     // Check for walls and ghosts
+    locksOrder(new_index, old_index, board);
+
     if (target_content == 'X' || target_content == 'M') {
+        unlockOrder(new_index, old_index, board);
         return INVALID_MOVE;
     }
 
@@ -319,6 +359,8 @@ int move_ghost(board_t* board, int ghost_index, command_t* command) {
 
     // Update board - set new position
     board->board[new_index].content = 'M';
+
+    unlockOrder(new_index, old_index, board);
     return result;
 }
 
@@ -345,6 +387,7 @@ void kill_pacman(board_t* board, int pacman_index) {
     int index = pac->pos_y * board->width + pac->pos_x;
 
     // Remove pacman from the board
+
     board->board[index].content = 'o';
 
     // Mark pacman as dead
@@ -356,6 +399,7 @@ int findFirstFreeSpot(board_t* board){
     //ver caso n haja free spot ? 
     int freeIndex = 0;
     for(int spot = 0; spot < (board->height * board->width) ; spot++){
+    
         if(board->board[spot].content == 'o' && board->board[spot].has_dot){
             freeIndex = spot;
             break;
