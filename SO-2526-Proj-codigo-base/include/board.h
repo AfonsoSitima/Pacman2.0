@@ -1,6 +1,8 @@
 #ifndef BOARD_H
 #define BOARD_H
 
+#include <pthread.h>
+
 #define MAX_MOVES 20
 #define MAX_LEVELS 20
 #define MAX_FILENAME 256
@@ -58,6 +60,10 @@ typedef struct {
     char pacman_file[256];  // file with pacman movements
     char ghosts_files[MAX_GHOSTS][256]; // files with monster movements
     int tempo;              // Duration of each play
+    pthread_t* tid;         //guardar as threads referentes aos ghosts
+    pthread_mutex_t ncurses_lock;
+    int ncursesDraw; //o que é preciso dar draw
+    int levelControl; //controlo para threadsx
 } board_t;
 
 typedef struct {
@@ -66,6 +72,12 @@ typedef struct {
     ghost_t* ghost;
     command_t* moves;
 } thread_ghost_t;
+
+typedef struct {
+    board_t* board; 
+    int running;
+} thread_ncurses;
+
 
 /*Makes the current thread sleep for 'int milliseconds' miliseconds*/
 void sleep_ms(int milliseconds);
