@@ -379,14 +379,12 @@ void kill_pacman(board_t* board, int pacman_index) {
     debug("Killing %d pacman\n\n", pacman_index);
     pacman_t* pac = &board->pacmans[pacman_index];
     int index = pac->pos_y * board->width + pac->pos_x;
-    pthread_mutex_lock(&board->board[index].lock);
 
     // Remove pacman from the board
     board->board[index].content = 'o';
     
     // Mark pacman as dead
     pac->alive = 0;
-    pthread_mutex_unlock(&board->board[index].lock);
 }
 
 //aux 1ª casa livre

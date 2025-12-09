@@ -418,6 +418,7 @@ board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil cons
         //ver o que fazer aqui
     }
     levels = realloc(levels, (numLevels + 1) * sizeof(board_t*));
+    levels[numLevels] = NULL;
 
     closedir(dirStream); //é preciso verificar se close foi feito com sucesso?
 
@@ -515,7 +516,7 @@ int main(int argc, char** argv) {
                 break;
             }
             
-            if(result == LOAD_BACKUP) {
+            /*if(result == LOAD_BACKUP) {
                 unload_allLevels(levels, indexLevel);
                 terminal_cleanup();
                 exit(1);  //o filho morre
@@ -525,7 +526,7 @@ int main(int argc, char** argv) {
                 result = (createBackup(&hasBackUp) == 1) ? QUIT_GAME : CONTINUE_PLAY;
             }
             
-
+*/
             if(result == QUIT_GAME) {
                 game_board->ncursesDraw = DRAW_GAME_OVER;
                 end_game = true;
