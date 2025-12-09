@@ -45,6 +45,7 @@ int terminal_init() {
 
 
 void draw_board(board_t* board, int mode) {
+    pthread_mutex_lock(&board->ncurses_lock);
     // Clear the screen before redrawing
     clear();
 
@@ -135,7 +136,7 @@ void draw_board(board_t* board, int mode) {
     mvprintw(start_row + board->height + 1, 0, "Points: %d",
            board->pacmans[0].points); // Assuming first pacman for now
     attroff(COLOR_PAIR(5));
-
+    pthread_mutex_unlock(&board->ncurses_lock);
 }
 
 void draw(char c, int colour_i, int pos_x, int pos_y) {

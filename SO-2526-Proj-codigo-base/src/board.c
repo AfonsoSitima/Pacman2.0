@@ -8,6 +8,23 @@
 #include <pthread.h>
 FILE * debugfile;
 
+
+void locksOrder(int new_index, int old_index, board_t* board){
+    if(new_index > old_index){
+        pthread_rwlock_wrlock(&board->board[new_index].lock); //lock posição de destino
+        pthread_rwlock_wrlock(&board->board[old_index].lock); //lock posição atual
+    }
+    else{
+        pthread_rwlock_wrlock(&board->board[old_index].lock); //lock posição atual
+        pthread_rwlock_wrlock(&board->board[new_index].lock); //lock posição de destino
+    }
+}
+
+void unlockOrder(int new_index, int old_index, board_t* board){
+    pthread_rwlock_unlock(&board->board[old_index].lock); //lock posição de saída
+    pthread_rwlock_unlock(&board->board[new_index].lock);
+}
+
 // Helper private function to find and kill pacman at specific position
 static int find_and_kill_pacman(board_t* board, int new_x, int new_y) {
     for (int p = 0; p < board->n_pacmans; p++) {
@@ -100,31 +117,28 @@ int move_pacman(board_t* board, int pacman_index, command_t* command) {
 
     int new_index = get_board_index(board, new_x, new_y);
     int old_index = get_board_index(board, pac->pos_x, pac->pos_y);
-    pthread_mutex_lock(&board->board[new_index].lock);
-    pthread_mutex_lock(&board->board[old_index].lock);
+
+    locksOrder(new_index, old_index, board);
 
     char target_content = board->board[new_index].content;
 
     if (board->board[new_index].has_portal) {
         board->board[old_index].content = 'o';
         board->board[new_index].content = 'P';
-        pthread_mutex_unlock(&board->board[new_index].lock);
-        pthread_mutex_unlock(&board->board[old_index].lock);
+        unlockOrder(new_index, old_index, board);
         return REACHED_PORTAL;
     }
 
     // Check for walls
     if (target_content == 'X') {
-        pthread_mutex_unlock(&board->board[new_index].lock);
-        pthread_mutex_unlock(&board->board[old_index].lock);
+        unlockOrder(new_index, old_index, board);
         return INVALID_MOVE;
     }
 
     // Check for ghosts
     if (target_content == 'M') {
         kill_pacman(board, pacman_index);
-        pthread_mutex_unlock(&board->board[new_index].lock);
-        pthread_mutex_unlock(&board->board[old_index].lock);
+        unlockOrder(new_index, old_index, board);
         return DEAD_PACMAN;
     }
 
@@ -138,9 +152,9 @@ int move_pacman(board_t* board, int pacman_index, command_t* command) {
     pac->pos_x = new_x;
     pac->pos_y = new_y;
     board->board[new_index].content = 'P';
+    unlockOrder(new_index, old_index, board);
 
-    pthread_mutex_unlock(&board->board[new_index].lock);
-    pthread_mutex_unlock(&board->board[old_index].lock);
+
     return VALID_MOVE;
 }
 
@@ -219,6 +233,7 @@ static int move_ghost_charged_direction(board_t* board, ghost_t* ghost, char dir
             debug("DEFAULT CHARGED MOVE - direction = %c\n", direction);
             return INVALID_MOVE;
     }
+
     return VALID_MOVE;
 }   
 
@@ -230,18 +245,24 @@ int move_ghost_charged(board_t* board, int ghost_index, char direction) {
     int new_y = y;
 
     ghost->charged = 0; //uncharge
+
+    locksOrder(get_board_index(board, x, y), get_board_index(board, x, y), board);
+    
     int result = move_ghost_charged_direction(board, ghost, direction, &new_x, &new_y);
+
+    unlockOrder(get_board_index(board, x, y), get_board_index(board, x, y), board);
     if (result == INVALID_MOVE) {
         debug("DEFAULT CHARGED MOVE - direction = %c\n", direction);
         return INVALID_MOVE;
     }
 
+
     // Get board indices
     int old_index = get_board_index(board, ghost->pos_x, ghost->pos_y);
     int new_index = get_board_index(board, new_x, new_y);
 
-    pthread_mutex_lock(&board->board[old_index].lock);
-    pthread_mutex_lock(&board->board[new_index].lock);
+    locksOrder(new_index, old_index, board);
+
     // Update board - clear old position (restore what was there)
     board->board[old_index].content = 'o'; // Or restore the dot if ghost was on one
     // Update ghost position
@@ -249,9 +270,8 @@ int move_ghost_charged(board_t* board, int ghost_index, char direction) {
     ghost->pos_y = new_y;
     // Update board - set new position
     board->board[new_index].content = 'M';
-    
-    pthread_mutex_unlock(&board->board[old_index].lock);
-    pthread_mutex_unlock(&board->board[new_index].lock);
+
+    unlockOrder(new_index, old_index, board);
 
     return result;
 }
@@ -321,37 +341,31 @@ int move_ghost(board_t* board, int ghost_index, command_t* command) {
     char target_content = board->board[new_index].content;
 
     // Check for walls and ghosts
+    locksOrder(new_index, old_index, board);
+
     if (target_content == 'X' || target_content == 'M') {
+        unlockOrder(new_index, old_index, board);
         return INVALID_MOVE;
     }
 
     int result = VALID_MOVE;
-    //supostamente evita deadlocks
-    if(new_index > old_index){
-        pthread_mutex_lock(&board->board[new_index].lock); //lock posição de destino
-        pthread_mutex_lock(&board->board[old_index].lock); //lock posição atual
-    }
-    else{
-        pthread_mutex_lock(&board->board[old_index].lock); //lock posição atual
-        pthread_mutex_lock(&board->board[new_index].lock); //lock posição de destino
-    }
     
     // Check for pacman
     if (target_content == 'P') {
         result = find_and_kill_pacman(board, new_x, new_y);
     }
-    
+    pthread_mutex_lock(&board->ncurses_lock);
     // Update board - clear old position (restore what was there)
     board->board[old_index].content = 'o'; // Or restore the dot if ghost was on one
-
+    pthread_mutex_unlock(&board->ncurses_lock);
     // Update ghost position
     ghost->pos_x = new_x;
     ghost->pos_y = new_y;
 
     // Update board - set new position
     board->board[new_index].content = 'M';
-    pthread_mutex_unlock(&board->board[old_index].lock); //lock posição de saída
-    pthread_mutex_unlock(&board->board[new_index].lock);
+
+    unlockOrder(new_index, old_index, board);
     return result;
 }
 
@@ -360,14 +374,12 @@ int move_ghost(board_t* board, int ghost_index, command_t* command) {
 //ver onde por locks
 //thread a desbloquear a casa onde estava e a bloquear a casa para onde vai
 void* ghost_thread(void* thread_data) {
-    int result = 1;
     thread_ghost_t* data = (thread_ghost_t*)thread_data;
     board_t* board = data->board;
     int ghost_index = data->index; 
     ghost_t* ghost = &board->ghosts[ghost_index];
-    while(result != DEAD_PACMAN && data->board->levelControl) { //Arranjar forma de ver se o pacman entrou no portal
-        result = move_ghost(board, ghost_index, &ghost->moves[ghost->current_move % ghost->n_moves]);
-        sleep_ms(board->tempo); //para esperar entre jogadas
+    while(board->active) { //Arranjar forma de ver se o pacman entrou no portal
+        move_ghost(board, ghost_index, &ghost->moves[ghost->current_move % ghost->n_moves]);
     }
     free(data);
     return NULL;
@@ -381,7 +393,9 @@ void kill_pacman(board_t* board, int pacman_index) {
     int index = pac->pos_y * board->width + pac->pos_x;
 
     // Remove pacman from the board
+    pthread_mutex_lock(&board->ncurses_lock);
     board->board[index].content = 'o';
+    pthread_mutex_unlock(&board->ncurses_lock);
     
     // Mark pacman as dead
     pac->alive = 0;
@@ -392,6 +406,7 @@ int findFirstFreeSpot(board_t* board){
     //ver caso n haja free spot ? 
     int freeIndex = 0;
     for(int spot = 0; spot < (board->height * board->width) ; spot++){
+    
         if(board->board[spot].content == 'o' && board->board[spot].has_dot){
             freeIndex = spot;
             break;
@@ -438,7 +453,6 @@ int load_level(board_t *board, int points) {
     for(int i = 0; i < board->n_ghosts; i++){
         load_ghost(board, &board->ghosts[i]);
     }
-    board->levelControl = 1;
     return 0;
 }
 
@@ -448,15 +462,16 @@ int load_level(board_t *board, int points) {
 void freeLevel(board_t *level){
     if (level->board != NULL){
         for(int i = 0; i < level->width * level->height; i++){
-            pthread_mutex_destroy(&level->board[i].lock);
+            pthread_rwlock_destroy(&level->board[i].lock);
             
         }
-        pthread_mutex_destroy(&level->ncurses_lock); // destruir o lock
+        //pthread_mutex_destroy(&level->ncurses_lock); // destruir o lock
         free(level->board); 
     }
     if (level->pacmans != NULL) free(level->pacmans);
     if (level->ghosts != NULL) free(level->ghosts);
     if (level->tid != NULL) free(level->tid);
+    pthread_mutex_destroy(&level->ncurses_lock); // destruir o ncurses lock
     free(level);
 }
 void unload_level(board_t *level) {
@@ -465,8 +480,8 @@ void unload_level(board_t *level) {
 }
 void unload_allLevels(board_t **levels, int currentLevel){
     for(int level = currentLevel; levels[level]; level++){
-        //levels[level] = NULL;
-        unload_level(levels[level]);
+        
+        levels[level] = NULL;
     }
     free(levels);
 }
