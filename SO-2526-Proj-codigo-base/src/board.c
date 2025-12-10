@@ -269,8 +269,9 @@ int move_ghost_charged(board_t* board, int ghost_index, char direction) {
     ghost->pos_x = new_x;
     ghost->pos_y = new_y;
     // Update board - set new position
+    pthread_mutex_lock(&board->ncurses_lock);
     board->board[new_index].content = 'M';
-
+    pthread_mutex_unlock(&board->ncurses_lock);
     unlockOrder(new_index, old_index, board);
 
     return result;
@@ -338,10 +339,11 @@ int move_ghost(board_t* board, int ghost_index, command_t* command) {
     // Check board position
     int new_index = get_board_index(board, new_x, new_y);
     int old_index = get_board_index(board, ghost->pos_x, ghost->pos_y);
+    locksOrder(new_index, old_index, board);
+
     char target_content = board->board[new_index].content;
 
     // Check for walls and ghosts
-    locksOrder(new_index, old_index, board);
 
     if (target_content == 'X' || target_content == 'M') {
         unlockOrder(new_index, old_index, board);
@@ -380,6 +382,8 @@ void* ghost_thread(void* thread_data) {
     ghost_t* ghost = &board->ghosts[ghost_index];
     while(board->active) { //Arranjar forma de ver se o pacman entrou no portal
         move_ghost(board, ghost_index, &ghost->moves[ghost->current_move % ghost->n_moves]);
+
+        sleep_ms(board->tempo);
     }
     free(data);
     return NULL;
