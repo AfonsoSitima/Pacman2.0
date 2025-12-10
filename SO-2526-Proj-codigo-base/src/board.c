@@ -39,7 +39,7 @@ static int find_and_kill_pacman(board_t* board, int new_x, int new_y) {
 }
 
 // Helper private function for getting board position index
-static inline int get_board_index(board_t* board, int x, int y) {
+int get_board_index(board_t* board, int x, int y) {
     return y * board->width + x;
 }
 
@@ -170,15 +170,20 @@ static int move_ghost_charged_direction(board_t* board, ghost_t* ghost, char dir
             if (y == 0) return INVALID_MOVE;
             *new_y = 0; // In case there is no colision
             for (int i = y - 1; i >= 0; i--) {
+                pthread_rwlock_wrlock(&board->board[get_board_index(board, x, i)].lock);
                 char target_content = board->board[get_board_index(board, x, i)].content;
                 if (target_content == 'X' || target_content == 'M') {
                     *new_y = i + 1; // stop before colision
+                    pthread_rwlock_unlock(&board->board[get_board_index(board, x, i)].lock);
                     return VALID_MOVE;
                 }
                 else if (target_content == 'P') {
                     *new_y = i;
-                    return find_and_kill_pacman(board, *new_x, *new_y);
+                    int result = find_and_kill_pacman(board, *new_x, *new_y);
+                    pthread_rwlock_unlock(&board->board[get_board_index(board, x, i)].lock);
+                    return result;
                 }
+                pthread_rwlock_unlock(&board->board[get_board_index(board, x, i)].lock);
             }
             break;
 
@@ -186,15 +191,20 @@ static int move_ghost_charged_direction(board_t* board, ghost_t* ghost, char dir
             if (y == board->height - 1) return INVALID_MOVE;
             *new_y = board->height - 1; // In case there is no colision
             for (int i = y + 1; i < board->height; i++) {
+                pthread_rwlock_wrlock(&board->board[get_board_index(board, x, i)].lock);
                 char target_content = board->board[get_board_index(board, x, i)].content;
                 if (target_content == 'X' || target_content == 'M') {
                     *new_y = i - 1; // stop before colision
+                    pthread_rwlock_unlock(&board->board[get_board_index(board, x, i)].lock);
                     return VALID_MOVE;
                 }
                 if (target_content == 'P') {
                     *new_y = i;
-                    return find_and_kill_pacman(board, *new_x, *new_y);
+                    int result = find_and_kill_pacman(board, *new_x, *new_y);
+                    pthread_rwlock_unlock(&board->board[get_board_index(board, x, i)].lock);
+                    return result;
                 }
+                pthread_rwlock_unlock(&board->board[get_board_index(board, x, i)].lock);
             }
             break;
 
@@ -202,15 +212,20 @@ static int move_ghost_charged_direction(board_t* board, ghost_t* ghost, char dir
             if (x == 0) return INVALID_MOVE;
             *new_x = 0; // In case there is no colision
             for (int j = x - 1; j >= 0; j--) {
+                pthread_rwlock_wrlock(&board->board[get_board_index(board, j, y)].lock);
                 char target_content = board->board[get_board_index(board, j, y)].content;
                 if (target_content == 'X' || target_content == 'M') {
                     *new_x = j + 1; // stop before colision
+                    pthread_rwlock_unlock(&board->board[get_board_index(board, j, y)].lock);
                     return VALID_MOVE;
                 }
                 if (target_content == 'P') {
                     *new_x = j;
-                    return find_and_kill_pacman(board, *new_x, *new_y);
+                    int result = find_and_kill_pacman(board, *new_x, *new_y);
+                    pthread_rwlock_unlock(&board->board[get_board_index(board, j, y)].lock);
+                    return result;
                 }
+                pthread_rwlock_unlock(&board->board[get_board_index(board, j, y)].lock);
             }
             break;
 
@@ -218,15 +233,20 @@ static int move_ghost_charged_direction(board_t* board, ghost_t* ghost, char dir
             if (x == board->width - 1) return INVALID_MOVE;
             *new_x = board->width - 1; // In case there is no colision
             for (int j = x + 1; j < board->width; j++) {
+                pthread_rwlock_wrlock(&board->board[get_board_index(board, j, y)].lock);
                 char target_content = board->board[get_board_index(board, j, y)].content;
                 if (target_content == 'X' || target_content == 'M') {
                     *new_x = j - 1; // stop before colision
+                    pthread_rwlock_unlock(&board->board[get_board_index(board, j, y)].lock);
                     return VALID_MOVE;
                 }
                 if (target_content == 'P') {
                     *new_x = j;
-                    return find_and_kill_pacman(board, *new_x, *new_y);
+                    int result = find_and_kill_pacman(board, *new_x, *new_y);
+                    pthread_rwlock_unlock(&board->board[get_board_index(board, j, y)].lock);
+                    return result;
                 }
+                pthread_rwlock_unlock(&board->board[get_board_index(board, j, y)].lock);
             }
             break;
         default:
@@ -246,11 +266,8 @@ int move_ghost_charged(board_t* board, int ghost_index, char direction) {
 
     ghost->charged = 0; //uncharge
 
-    locksOrder(get_board_index(board, x, y), get_board_index(board, x, y), board);
-    
     int result = move_ghost_charged_direction(board, ghost, direction, &new_x, &new_y);
 
-    unlockOrder(get_board_index(board, x, y), get_board_index(board, x, y), board);
     if (result == INVALID_MOVE) {
         debug("DEFAULT CHARGED MOVE - direction = %c\n", direction);
         return INVALID_MOVE;
@@ -344,7 +361,6 @@ int move_ghost(board_t* board, int ghost_index, command_t* command) {
     char target_content = board->board[new_index].content;
 
     // Check for walls and ghosts
-
     if (target_content == 'X' || target_content == 'M') {
         unlockOrder(new_index, old_index, board);
         return INVALID_MOVE;
@@ -356,10 +372,10 @@ int move_ghost(board_t* board, int ghost_index, command_t* command) {
     if (target_content == 'P') {
         result = find_and_kill_pacman(board, new_x, new_y);
     }
-    pthread_mutex_lock(&board->ncurses_lock);
+    //pthread_mutex_lock(&board->ncurses_lock);
     // Update board - clear old position (restore what was there)
     board->board[old_index].content = 'o'; // Or restore the dot if ghost was on one
-    pthread_mutex_unlock(&board->ncurses_lock);
+    //pthread_mutex_unlock(&board->ncurses_lock);
     // Update ghost position
     ghost->pos_x = new_x;
     ghost->pos_y = new_y;
@@ -397,9 +413,9 @@ void kill_pacman(board_t* board, int pacman_index) {
     int index = pac->pos_y * board->width + pac->pos_x;
 
     // Remove pacman from the board
-    pthread_mutex_lock(&board->ncurses_lock);
+    //pthread_mutex_lock(&board->ncurses_lock);
     board->board[index].content = 'o';
-    pthread_mutex_unlock(&board->ncurses_lock);
+    //pthread_mutex_unlock(&board->ncurses_lock);
     
     // Mark pacman as dead
     pac->alive = 0;

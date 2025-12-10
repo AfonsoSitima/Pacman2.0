@@ -428,6 +428,17 @@ void stop_ghost_threads(board_t* board) {
 
 
 
+void* ncurses_thread(void* arg) {
+    thread_ncurses* data = arg;
+    board_t* board = data->board;
+
+    while (data->running && board->active) {
+        screen_refresh(board, DRAW_MENU);
+    }
+    return NULL;
+}
+
+
 int main(int argc, char** argv) {
     if (argc != 2) {
         printf("Usage: %s <level_directory>\n", argv[0]);
@@ -445,6 +456,7 @@ int main(int argc, char** argv) {
     int accumulated_points = 0;
     bool end_game = false;
     bool hasBackUp = false;
+
     
     board_t** levels = handle_files(argv[1]);
     
@@ -459,9 +471,18 @@ int main(int argc, char** argv) {
         
         load_level(game_board, accumulated_points); //NO NOVO MÉTODO TEM DE ACUMULAR PONTOS
 
-        draw_board(game_board, DRAW_MENU);
+        pthread_t ncurses_tid;
+        thread_ncurses ncurses_data;
 
-        refresh_screen();
+        ncurses_data.board = game_board;
+        ncurses_data.running = 1;
+        pthread_create(&ncurses_tid, NULL, ncurses_thread, &ncurses_data);
+
+        //tart_ncurses_thread(game_board);
+
+        //draw_board(game_board, DRAW_MENU);
+
+        //refresh_screen();
 
         
         start_ghost_threads(game_board); //talvez começar isto no load_level????
@@ -470,6 +491,8 @@ int main(int argc, char** argv) {
             int result = play_board(game_board, hasBackUp); 
             if(result == NEXT_LEVEL) {
                 game_board->active = 0; 
+                ncurses_data.running = 0;
+                pthread_join(ncurses_tid, NULL);
                 screen_refresh(game_board, DRAW_WIN);
                 sleep_ms(game_board->tempo); 
                 indexLevel++;
@@ -477,6 +500,7 @@ int main(int argc, char** argv) {
             }
 
             if(result == LOAD_BACKUP) { 
+                game_board->active = 0;
                 unload_allLevels(levels, indexLevel);
                 terminal_cleanup();
                 exit(1);  //o filho morre
@@ -489,13 +513,15 @@ int main(int argc, char** argv) {
 
             if(result == QUIT_GAME) {
                 game_board->active = 0; 
+                ncurses_data.running = 0;
+                pthread_join(ncurses_tid, NULL);
                 screen_refresh(game_board, DRAW_GAME_OVER); 
                 sleep_ms(game_board->tempo);
                 end_game = true;
                 break;
             }
     
-            screen_refresh(game_board, DRAW_MENU); 
+            //screen_refresh(game_board, DRAW_MENU); 
 
             accumulated_points = game_board->pacmans[0].points;      
         }

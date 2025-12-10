@@ -43,55 +43,53 @@ int terminal_init() {
     return 0;
 }
 
-
+//mudei bue isto
 void draw_board(board_t* board, int mode) {
+    // Garante que só uma thread mexe no ncurses de cada vez
     pthread_mutex_lock(&board->ncurses_lock);
-    // Clear the screen before redrawing
+
+    // Limpar o ecrã antes de redesenhar
     clear();
 
-    // Draw the border/title
+    // Título / barra de estado
     attron(COLOR_PAIR(5));
     mvprintw(0, 0, "=== PACMAN GAME ===");
-    switch(mode) {
-    case DRAW_GAME_OVER:
-        mvprintw(1, 0, " GAME OVER ");
-        break;
-
-    case DRAW_WIN:
-        mvprintw(1, 0, " VICTORY ");
-        break;
-
-    case DRAW_MENU:
-        mvprintw(1, 0, "Level: %s | Use W/A/S/D to move | Q to quit | G to quicksave ", board->level_name);
-        break;
+    switch (mode) {
+        case DRAW_GAME_OVER:
+            mvprintw(1, 0, " GAME OVER ");
+            break;
+        case DRAW_WIN:
+            mvprintw(1, 0, " VICTORY ");
+            break;
+        case DRAW_MENU:
+            mvprintw(1, 0,
+                     "Level: %s | Use W/A/S/D to move | Q to quit | G to quicksave ",
+                     board->level_name);
+            break;
     }
+    attroff(COLOR_PAIR(5));
 
-
-    // Starting row for the game board (leave space for UI)
+    // Primeira linha do tabuleiro (reservar espaço para a UI)
     int start_row = 3;
 
-    // Draw the board
+    // Desenhar o tabuleiro
     for (int y = 0; y < board->height; y++) {
         for (int x = 0; x < board->width; x++) {
-            int index = y * board->width + x;
-            char ch = board->board[index].content;
-            int ghost_charged = 0;
+            int index = get_board_index(board, x, y);
 
-            for (int g = 0; g < board->n_ghosts; g++) {
-                ghost_t* ghost = &board->ghosts[g];
-                if (ghost->pos_x == x && ghost->pos_y == y) {
-                    if (ghost->charged)
-                        ghost_charged = 1;
-                    break;
-                }
-            }
+            // Ler o estado da casa com lock de LEITURA
+            pthread_rwlock_rdlock(&board->board[index].lock);
+            char ch        = board->board[index].content;
+            int has_dot    = board->board[index].has_dot;
+            int has_portal = board->board[index].has_portal;
+            pthread_rwlock_unlock(&board->board[index].lock);
 
-            // Move cursor to position
+            // Mover o cursor para a posição correspondente
             move(start_row + y, x);
 
-            // Draw with appropriate color
+            // Desenhar com a cor apropriada
             switch (ch) {
-                case 'X': // Wall
+                case 'X': // Parede
                     attron(COLOR_PAIR(3));
                     addch('#');
                     attroff(COLOR_PAIR(3));
@@ -103,25 +101,24 @@ void draw_board(board_t* board, int mode) {
                     attroff(COLOR_PAIR(1) | A_BOLD);
                     break;
 
-                case 'M': // Monster/Ghost
-                    attron((COLOR_PAIR(2) | A_BOLD) | ((ghost_charged) ? (A_DIM) : (0)));
+                case 'M': // Fantasma
+                    attron(COLOR_PAIR(2) | A_BOLD);
                     addch('M');
-                    attroff((COLOR_PAIR(2) | A_BOLD) | ((ghost_charged) ? (A_DIM) : (0)));
+                    attroff(COLOR_PAIR(2) | A_BOLD);
                     break;
 
-                case 'o': // Empty space
-                    if (board->board[index].has_portal) {
+                case 'o': // Espaço vazio / ponto / portal
+                    if (has_portal) {
                         attron(COLOR_PAIR(6));
                         addch('@');
                         attroff(COLOR_PAIR(6));
-                    }
-                    else if (board->board[index].has_dot) {
+                    } else if (has_dot) {
                         attron(COLOR_PAIR(4));
                         addch('.');
                         attroff(COLOR_PAIR(4));
-                    }
-                    else
+                    } else {
                         addch(' ');
+                    }
                     break;
 
                 default:
@@ -131,11 +128,15 @@ void draw_board(board_t* board, int mode) {
         }
     }
 
-    // Draw score/status at the bottom
+    // Desenhar pontuação no fundo
     attron(COLOR_PAIR(5));
-    mvprintw(start_row + board->height + 1, 0, "Points: %d",
-           board->pacmans[0].points); // Assuming first pacman for now
+    int points = 0;
+    if (board->n_pacmans > 0) {
+        points = board->pacmans[0].points; // assumimos primeiro pacman
+    }
+    mvprintw(start_row + board->height + 1, 0, "Points: %d", points);
     attroff(COLOR_PAIR(5));
+
     pthread_mutex_unlock(&board->ncurses_lock);
 }
 
