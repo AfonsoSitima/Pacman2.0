@@ -1,6 +1,8 @@
 #ifndef BOARD_H
 #define BOARD_H
 
+#include <pthread.h>
+
 #define MAX_MOVES 20
 #define MAX_LEVELS 20
 #define MAX_FILENAME 256
@@ -28,6 +30,7 @@ typedef struct {
     int current_move;
     int n_moves; // number of predefined moves, 0 if controlled by user, >0 if readed from level file
     int waiting;
+    pthread_rwlock_t lock;
 } pacman_t;
 
 typedef struct {
@@ -41,16 +44,10 @@ typedef struct {
 } ghost_t;
 
 typedef struct {
-    int index;
-    board_t* board;
-    ghost_t* ghost;
-    command_t* moves;
-} thread_ghost_t;
-
-typedef struct {
     char content;   // stuff like 'P' for pacman 'M' for monster/ghost and 'W' for wall
     int has_dot;    // whether there is a dot in this position or not
     int has_portal; // whether there is a portal in this position or not
+    pthread_rwlock_t lock;
 } board_pos_t;
 
 typedef struct {
@@ -64,7 +61,37 @@ typedef struct {
     char pacman_file[256];  // file with pacman movements
     char ghosts_files[MAX_GHOSTS][256]; // files with monster movements
     int tempo;              // Duration of each play
+    int hasBackup;
+    pthread_t* tid; //tids of ghost threads
+    pthread_mutex_t ncurses_lock;
+    pthread_mutex_t state_lock;
+    //int ncursesDraw; //o que é preciso dar draw
+    int active; //nivel não mudou
+    pthread_t pacTid; //tid of pacman thread
+    pthread_t ncursesTid; //tid of ncurses thread
+
 } board_t;
+
+typedef struct {
+    int index;
+    board_t* board;
+    ghost_t* ghost;
+    command_t* moves;
+} thread_ghost_t;
+
+typedef struct {
+    board_t* board; 
+    int running;
+} thread_ncurses;
+
+typedef struct {
+    int index;
+    int hasBackup;
+    board_t* board;
+    pacman_t* pacman;
+    command_t* moves;
+} thread_pacman_t;
+
 
 /*Makes the current thread sleep for 'int milliseconds' miliseconds*/
 void sleep_ms(int milliseconds);
@@ -82,13 +109,24 @@ void kill_pacman(board_t* board, int pacman_index);
 int load_pacman(board_t* board, int points);
 
 /*Adds a ghost(monster) to the board*/
-int load_ghost(board_t* board);
+int load_ghost(board_t* board, ghost_t* ghost);
 
 /*Loads a level into board*/
 int load_level(board_t* board, int accumulated_points);
 
+void freePac(pacman_t *pacman);
+
+void freeGhost(ghost_t *ghost);
+
+
+void freeLevel(board_t *level);
+
 /*Unloads levels loaded by load_level*/
 void unload_level(board_t * board);
+
+/*DOCUMENTAR!!!!! */
+void unload_allLevels(board_t **levels, int currentLevel);
+
 
 // DEBUG FILE
 
@@ -105,5 +143,4 @@ void debug(const char * format, ...);
 void print_board(board_t* board);
 
 void* ghost_thread(void* arg);
-
 #endif

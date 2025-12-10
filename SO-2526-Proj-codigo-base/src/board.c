@@ -47,7 +47,6 @@ static int find_and_kill_pacman(board_t* board, int new_x, int new_y) {
             kill_pacman(board, p);
             return DEAD_PACMAN;
         }
-        //pthread_rwlock_unlock(&pac->lock);
     }
     return VALID_MOVE;
 }
