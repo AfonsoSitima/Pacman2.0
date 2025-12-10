@@ -34,16 +34,25 @@ void unlockOrder(int new_index, int old_index, board_t* board){
 static int find_and_kill_pacman(board_t* board, int new_x, int new_y) {
     for (int p = 0; p < board->n_pacmans; p++) {
         pacman_t* pac = &board->pacmans[p];
-        if (pac->pos_x == new_x && pac->pos_y == new_y && pac->alive) {
+        pthread_rwlock_rdlock(&pac->lock);
+        int px = pac->pos_x;
+        int py = pac->pos_y;
+        int alive = pac->alive;
+        if (px == new_x && py == new_y && alive) {
+            pthread_rwlock_unlock(&pac->lock);
+            pthread_rwlock_wrlock(&pac->lock);
             pac->alive = 0;
+            pthread_rwlock_unlock(&pac->lock);
             kill_pacman(board, p);
             return DEAD_PACMAN;
         }
+        pthread_rwlock_unlock(&pac->lock);
     }
     return VALID_MOVE;
 }
 
 // Helper private function for getting board position index
+//FIXMEEEEE
 int get_board_index(board_t* board, int x, int y) {
     return y * board->width + x;
 }
@@ -61,15 +70,22 @@ void sleep_ms(int milliseconds) {
 }
 
 int move_pacman(board_t* board, int pacman_index, command_t* command) {
+
+    pthread_rwlock_rdlock(&board->pacmans[pacman_index].lock);
     if (pacman_index < 0 || !board->pacmans[pacman_index].alive) {
+        pthread_rwlock_unlock(&board->pacmans[pacman_index].lock);
         return DEAD_PACMAN; // Invalid or dead pacman
     }
+    pthread_rwlock_unlock(&board->pacmans[pacman_index].lock);
+
 
     pacman_t* pac = &board->pacmans[pacman_index];
     debug("%d %d\n", pac->pos_x ,pac->pos_y);
+    pthread_rwlock_wrlock(&pac->lock);
     int new_x = pac->pos_x;
     int new_y = pac->pos_y;
-    
+    pthread_rwlock_unlock(&pac->lock);
+
     // check passo
     if (pac->waiting > 0) {
         pac->waiting -= 1;
@@ -401,7 +417,11 @@ void* ghost_thread(void* thread_data) {
     board_t* board = data->board;
     int ghost_index = data->index; 
     ghost_t* ghost = &board->ghosts[ghost_index];
-    while(board->active) { //Arranjar forma de ver se o pacman entrou no portal
+    while(1) { //Arranjar forma de ver se o pacman entrou no portal
+        pthread_mutex_lock(&board->state_lock);
+        int active = board->active;
+        pthread_mutex_unlock(&board->state_lock);
+        if (!active) break;
         move_ghost(board, ghost_index, &ghost->moves[ghost->current_move % ghost->n_moves]);
 
         sleep_ms(board->tempo);
@@ -432,15 +452,18 @@ void* pacman_thread(void* thread_data) {
 void kill_pacman(board_t* board, int pacman_index) {
     debug("Killing %d pacman\n\n", pacman_index);
     pacman_t* pac = &board->pacmans[pacman_index];
+    pthread_rwlock_rdlock(&pac->lock);
     int index = pac->pos_y * board->width + pac->pos_x;
+    pthread_rwlock_unlock(&pac->lock);
 
-    // Remove pacman from the board
-    //pthread_mutex_lock(&board->ncurses_lock);
+    //sempre que chamamos esta função já temos o lock para esta posição
     board->board[index].content = 'o';
     //pthread_mutex_unlock(&board->ncurses_lock);
     
     // Mark pacman as dead
+    pthread_rwlock_wrlock(&pac->lock);
     pac->alive = 0;
+    pthread_rwlock_unlock(&pac->lock);
 }
 
 //aux 1ª casa livre
@@ -473,7 +496,8 @@ int load_pacman(board_t* board, int points) {
         pacman->alive = 1;
         board->board[startIndex].content = 'P';
         board->pacmans[0] = *pacman;
-        free(pacman); //já não é necessário
+        pthread_rwlock_init(&pacman->lock, NULL);
+
 
     }else{
         

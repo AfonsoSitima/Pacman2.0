@@ -74,12 +74,15 @@ int play_board(board_t * game_board, bool hasBackUp) {
         return QUIT_GAME;
     }
             
-    
-    if (!game_board->pacmans[0].alive) {
+    pthread_rwlock_rdlock(&pacman->lock);
+    int alive = pacman->alive;
+
+    if (!alive) {
+        pthread_rwlock_unlock(&pacman->lock);
         if (hasBackUp) return LOAD_BACKUP;
         return QUIT_GAME;
     }      //NAO SEI SE ISTO É PRECISO AQUI
-
+    pthread_rwlock_unlock(&pacman->lock);
     return CONTINUE_PLAY;  
 }
 
@@ -343,6 +346,7 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
     }
     lvl->tid = malloc(lvl->n_ghosts * sizeof(pthread_t)); //alocar espaço para os tids das threads Ghosts
     pthread_mutex_init(&lvl->ncurses_lock, NULL); //lock do ncurses
+    pthread_mutex_init(&lvl->state_lock, NULL);
 
 
     free(lines);
@@ -457,7 +461,15 @@ void* ncurses_thread(void* arg) {
     thread_ncurses* data = arg;
     board_t* board = data->board;
 
-    while (data->running && board->active) {
+    while (1) {
+        pthread_mutex_lock(&board->state_lock);
+        int active = board->active;
+        int running = data->running;
+        pthread_mutex_unlock(&board->state_lock);
+
+        if (!active || !running)
+            break;
+
         screen_refresh(board, DRAW_MENU);
     }
     return NULL;
@@ -522,8 +534,10 @@ int main(int argc, char** argv) {
             
             int result = play_board(game_board, hasBackUp); 
             if(result == NEXT_LEVEL) {
+                pthread_mutex_lock(&game_board->state_lock);
                 game_board->active = 0; 
                 ncurses_data.running = 0;
+                pthread_mutex_unlock(&game_board->state_lock);
                 pthread_join(ncurses_tid, NULL);
                 screen_refresh(game_board, DRAW_WIN);
                 sleep_ms(game_board->tempo); 
@@ -532,6 +546,9 @@ int main(int argc, char** argv) {
             }
 
             if(result == LOAD_BACKUP) { 
+                pthread_mutex_lock(&game_board->state_lock);
+                game_board->active = 0;
+                pthread_mutex_unlock(&game_board->state_lock);
                 game_board->active = 0;
                 unload_allLevels(levels, indexLevel);
                 terminal_cleanup();
@@ -544,8 +561,10 @@ int main(int argc, char** argv) {
 
 
             if(result == QUIT_GAME) {
+                pthread_mutex_lock(&game_board->state_lock);
                 game_board->active = 0; 
                 ncurses_data.running = 0;
+                pthread_mutex_unlock(&game_board->state_lock);
                 pthread_join(ncurses_tid, NULL);
                 screen_refresh(game_board, DRAW_GAME_OVER); 
                 sleep_ms(game_board->tempo);

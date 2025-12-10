@@ -64,6 +64,7 @@ typedef struct {
     pthread_t* tid; //tids of ghost threads
     pthread_t pacTid; //tid of pacman thread
     pthread_mutex_t ncurses_lock;
+    pthread_mutex_t state_lock;
     //int ncursesDraw; //o que é preciso dar draw
     int active; //nivel não mudou
 } board_t;
