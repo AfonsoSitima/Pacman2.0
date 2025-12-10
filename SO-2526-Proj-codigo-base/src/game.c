@@ -453,6 +453,17 @@ void* ncurses_thread(void* arg) {
 }
 
 
+void* ncurses_thread(void* arg) {
+    thread_ncurses* data = arg;
+    board_t* board = data->board;
+
+    while (data->running && board->active) {
+        screen_refresh(board, DRAW_MENU);
+    }
+    return NULL;
+}
+
+
 int main(int argc, char** argv) {
     if (argc != 2) {
         printf("Usage: %s <level_directory>\n", argv[0]);
@@ -491,6 +502,12 @@ int main(int argc, char** argv) {
         ncurses_data.board = game_board;
         ncurses_data.running = 1;
         pthread_create(&ncurses_tid, NULL, ncurses_thread, &ncurses_data);
+
+        //tart_ncurses_thread(game_board);
+
+        //draw_board(game_board, DRAW_MENU);
+
+        //refresh_screen();
 
         //tart_ncurses_thread(game_board);
 

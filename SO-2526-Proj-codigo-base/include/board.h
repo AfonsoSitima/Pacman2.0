@@ -88,12 +88,6 @@ typedef struct {
     int running;
 } thread_ncurses;
 
-
-
-//lock casas de forma a evitar deadlocks
-void locksOrder(int new_index, int old_index, board_t* board);
-void unlockOrder(int new_index, int old_index, board_t* board);
-
 int get_board_index(board_t* board, int x, int y);
 /*Makes the current thread sleep for 'int milliseconds' miliseconds*/
 void sleep_ms(int milliseconds);
