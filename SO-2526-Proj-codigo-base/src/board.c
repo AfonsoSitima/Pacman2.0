@@ -418,13 +418,11 @@ void* pacman_thread(void* thread_data) {
     while(board->active && pac->alive) { 
         //acho que é preciso distinguir entre pacman utilizador e file 
         //SE N METER CONTROLO PARA QUANDO É UTILIZADO A DIVISAO VAI DAR ERRO
-        if(strcmp(board->pacman_file, "")){
-            move_pacman(board, pac_index, &pac->moves[pac->current_move % pac->n_moves]);
-            sleep_ms(board->tempo);
-            debug("Pacman dormiu");
-        }else{
-            move_pacman(board, pac_index, &pac->moves[pac->current_move]);
-        }
+
+        move_pacman(board, pac_index, &pac->moves[pac->current_move % pac->n_moves]);
+        sleep_ms(board->tempo);
+        debug("Pacman dormiu");
+
     }
     free(data);
     return NULL;

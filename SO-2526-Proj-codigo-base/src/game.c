@@ -497,8 +497,9 @@ int main(int argc, char** argv) {
         //draw_board(game_board, DRAW_MENU);
 
         //refresh_screen();
-        
-        start_pacman_thread(game_board);
+        if(strcmp(game_board->pacman_file, "")){
+            start_pacman_thread(game_board);
+        }
         start_ghost_threads(game_board); //talvez começar isto no load_level????
         while(true) {
             
@@ -540,7 +541,9 @@ int main(int argc, char** argv) {
             accumulated_points = game_board->pacmans[0].points;      
         }
         stop_ghost_threads(game_board);
-        stop_pacman_thread(game_board);
+        if(strcmp(game_board->pacman_file, "")){
+            stop_pacman_thread(game_board);
+        }
         print_board(game_board);
         unload_level(game_board);
         
