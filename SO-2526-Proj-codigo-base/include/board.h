@@ -63,6 +63,7 @@ typedef struct {
     int tempo;              // Duration of each play
     pthread_t* tid; //tids of ghost threads
     pthread_mutex_t ncurses_lock;
+    pthread_mutex_t state_lock;
     //int ncursesDraw; //o que é preciso dar draw
     int active; //nivel não mudou
 } board_t;

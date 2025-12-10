@@ -67,7 +67,7 @@ void draw_board(board_t* board, int mode) {
                      board->level_name);
             break;
     }
-    attroff(COLOR_PAIR(5));
+    //attroff(COLOR_PAIR(5));
 
     // Primeira linha do tabuleiro (reservar espaço para a UI)
     int start_row = 3;
@@ -131,9 +131,9 @@ void draw_board(board_t* board, int mode) {
     // Desenhar pontuação no fundo
     attron(COLOR_PAIR(5));
     int points = 0;
-    if (board->n_pacmans > 0) {
+    /*if (board->n_pacmans > 0) {
         points = board->pacmans[0].points; // assumimos primeiro pacman
-    }
+    }*/
     mvprintw(start_row + board->height + 1, 0, "Points: %d", points);
     attroff(COLOR_PAIR(5));
 

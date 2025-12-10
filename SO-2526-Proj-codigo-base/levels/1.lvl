@@ -2,7 +2,7 @@
 # só existe um no início por ficheiro
 DIM 6 6
 # TEMPO: indica a duração de cada jogada em milissegundos
-TEMPO 100
+TEMPO 150
 # MON: indica os nomes dos ficheiros de monstros usados neste nível
 MON 1.m
 # o ficheiro termina com o conteúdo da matriz de jogo em que "X"
