@@ -79,6 +79,10 @@ typedef struct {
     int running;
 } thread_ncurses;
 
+//lock casas de forma a evitar deadlocks
+void locksOrder(int new_index, int old_index, board_t* board);
+void unlockOrder(int new_index, int old_index, board_t* board);
+
 int get_board_index(board_t* board, int x, int y);
 /*Makes the current thread sleep for 'int milliseconds' miliseconds*/
 void sleep_ms(int milliseconds);
@@ -89,8 +93,13 @@ command - command to be processed*/
 int move_pacman(board_t* board, int pacman_index, command_t* command);
 int move_ghost(board_t* board, int ghost_index, command_t* command);
 
+void* ghost_thread(void* thread_data);
+
 /*Process the death of a Pacman*/
 void kill_pacman(board_t* board, int pacman_index);
+
+//aux para encontrar primeira casa livre para posicionar pacman
+int findFreePosition(board_t* board, int* x, int* y);
 
 /*Adds a pacman to the board*/
 int load_pacman(board_t* board, int points);
@@ -99,13 +108,9 @@ int load_pacman(board_t* board, int points);
 int load_ghost(board_t* board, ghost_t* ghost);
 
 /*Loads a level into board*/
-int load_level(board_t* board, int accumulated_points);
+int load_level(board_t* board, int points);
 
-void freePac(pacman_t *pacman);
-
-void freeGhost(ghost_t *ghost);
-
-
+/*Frees all memory allocated for a level*/
 void freeLevel(board_t *level);
 
 /*Unloads levels loaded by load_level*/

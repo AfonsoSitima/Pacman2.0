@@ -21,10 +21,15 @@ void locksOrder(int new_index, int old_index, board_t* board){
 }
 
 void unlockOrder(int new_index, int old_index, board_t* board){
-    pthread_rwlock_unlock(&board->board[old_index].lock); //lock posição de saída
-    pthread_rwlock_unlock(&board->board[new_index].lock);
+    if(new_index > old_index){
+        pthread_rwlock_unlock(&board->board[old_index].lock); //lock posição de saída
+        pthread_rwlock_unlock(&board->board[new_index].lock);
+    }
+    else{
+        pthread_rwlock_unlock(&board->board[new_index].lock); //lock posição de saída
+        pthread_rwlock_unlock(&board->board[old_index].lock);
+    }
 }
-
 // Helper private function to find and kill pacman at specific position
 static int find_and_kill_pacman(board_t* board, int new_x, int new_y) {
     for (int p = 0; p < board->n_pacmans; p++) {
@@ -121,7 +126,7 @@ int move_pacman(board_t* board, int pacman_index, command_t* command) {
     locksOrder(new_index, old_index, board);
 
     char target_content = board->board[new_index].content;
-
+ 
     if (board->board[new_index].has_portal) {
         board->board[old_index].content = 'o';
         board->board[new_index].content = 'P';
@@ -500,7 +505,6 @@ void unload_level(board_t *level) {
 }
 void unload_allLevels(board_t **levels, int currentLevel){
     for(int level = currentLevel; levels[level]; level++){
-        
         levels[level] = NULL;
     }
     free(levels);
