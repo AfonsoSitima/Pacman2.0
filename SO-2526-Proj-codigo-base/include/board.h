@@ -62,6 +62,7 @@ typedef struct {
     char ghosts_files[MAX_GHOSTS][256]; // files with monster movements
     int tempo;              // Duration of each play
     pthread_t* tid; //tids of ghost threads
+    pthread_t pacTid; //tid of pacman thread
     pthread_mutex_t ncurses_lock;
     //int ncursesDraw; //o que é preciso dar draw
     int active; //nivel não mudou
@@ -75,9 +76,19 @@ typedef struct {
 } thread_ghost_t;
 
 typedef struct {
+    int index;
+    board_t* board;
+    pacman_t* pacman;
+    command_t* moves;
+} thread_pacman_t;
+
+
+typedef struct {
     board_t* board; 
     int running;
 } thread_ncurses;
+
+
 
 //lock casas de forma a evitar deadlocks
 void locksOrder(int new_index, int old_index, board_t* board);
@@ -94,7 +105,7 @@ int move_pacman(board_t* board, int pacman_index, command_t* command);
 int move_ghost(board_t* board, int ghost_index, command_t* command);
 
 void* ghost_thread(void* thread_data);
-
+void* pacman_thread(void* thread_data);
 /*Process the death of a Pacman*/
 void kill_pacman(board_t* board, int pacman_index);
 

@@ -344,6 +344,7 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
     lvl->tid = malloc(lvl->n_ghosts * sizeof(pthread_t)); //alocar espaço para os tids das threads Ghosts
     pthread_mutex_init(&lvl->ncurses_lock, NULL); //lock do ncurses
 
+
     free(lines);
     free(buffer);
     close(fd); //close level file
@@ -427,7 +428,19 @@ void stop_ghost_threads(board_t* board) {
 
 }
 
-
+void start_pacman_thread(board_t* board) {
+    
+    thread_pacman_t* thread_data = malloc(sizeof(thread_pacman_t));
+    thread_data->index = 0; 
+    thread_data->board = board;
+    thread_data->moves = board->pacmans[0].moves;
+    pthread_create(&board->pacTid, NULL, (void*) pacman_thread, thread_data);
+    
+}
+void stop_pacman_thread(board_t* board) {
+    pthread_join(board->pacTid, NULL);
+    
+}
 
 void* ncurses_thread(void* arg) {
     thread_ncurses* data = arg;
@@ -484,8 +497,8 @@ int main(int argc, char** argv) {
         //draw_board(game_board, DRAW_MENU);
 
         //refresh_screen();
-
         
+        start_pacman_thread(game_board);
         start_ghost_threads(game_board); //talvez começar isto no load_level????
         while(true) {
             
@@ -527,6 +540,7 @@ int main(int argc, char** argv) {
             accumulated_points = game_board->pacmans[0].points;      
         }
         stop_ghost_threads(game_board);
+        stop_pacman_thread(game_board);
         print_board(game_board);
         unload_level(game_board);
         

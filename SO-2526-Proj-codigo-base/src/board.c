@@ -69,7 +69,7 @@ int move_pacman(board_t* board, int pacman_index, command_t* command) {
     debug("%d %d\n", pac->pos_x ,pac->pos_y);
     int new_x = pac->pos_x;
     int new_y = pac->pos_y;
-
+    
     // check passo
     if (pac->waiting > 0) {
         pac->waiting -= 1;
@@ -159,7 +159,7 @@ int move_pacman(board_t* board, int pacman_index, command_t* command) {
     board->board[new_index].content = 'P';
     unlockOrder(new_index, old_index, board);
 
-
+    sleep_ms(board->tempo);
     return VALID_MOVE;
 }
 
@@ -410,6 +410,25 @@ void* ghost_thread(void* thread_data) {
     return NULL;
 }
 
+void* pacman_thread(void* thread_data) {
+    thread_pacman_t* data = (thread_pacman_t*)thread_data;
+    board_t* board = data->board;
+    int pac_index = data->index;
+    pacman_t* pac = &board->pacmans[pac_index];
+    while(board->active && pac->alive) { 
+        //acho que é preciso distinguir entre pacman utilizador e file 
+        //SE N METER CONTROLO PARA QUANDO É UTILIZADO A DIVISAO VAI DAR ERRO
+        if(strcmp(board->pacman_file, "")){
+            move_pacman(board, pac_index, &pac->moves[pac->current_move % pac->n_moves]);
+            sleep_ms(board->tempo);
+            debug("Pacman dormiu");
+        }else{
+            move_pacman(board, pac_index, &pac->moves[pac->current_move]);
+        }
+    }
+    free(data);
+    return NULL;
+}
 
 
 void kill_pacman(board_t* board, int pacman_index) {
