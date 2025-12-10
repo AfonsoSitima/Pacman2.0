@@ -75,7 +75,7 @@ void draw_board(board_t* board, int mode) {
     // Desenhar o tabuleiro
     for (int y = 0; y < board->height; y++) {
         for (int x = 0; x < board->width; x++) {
-            int index = get_board_index(board, x, y);
+            int index = y * board->width + x;
 
             // Ler o estado da casa com lock de LEITURA
             pthread_rwlock_rdlock(&board->board[index].lock);

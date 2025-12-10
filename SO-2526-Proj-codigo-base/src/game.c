@@ -33,8 +33,8 @@ void screen_refresh(board_t * game_board, int mode) {
 int play_board(board_t * game_board, bool hasBackUp) {
     pacman_t* pacman = &game_board->pacmans[0];
     command_t* play;
+    command_t c;
     if (pacman->n_moves == 0) { // if is user input
-        command_t c; 
         c.command = get_input();
         
         if(c.command == '\0')

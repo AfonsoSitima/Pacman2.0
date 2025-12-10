@@ -80,7 +80,7 @@ typedef struct {
     int running;
 } thread_ncurses;
 
-int get_board_index(board_t* board, int x, int y);
+
 /*Makes the current thread sleep for 'int milliseconds' miliseconds*/
 void sleep_ms(int milliseconds);
 

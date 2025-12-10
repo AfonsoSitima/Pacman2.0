@@ -21,8 +21,14 @@ void locksOrder(int new_index, int old_index, board_t* board){
 }
 
 void unlockOrder(int new_index, int old_index, board_t* board){
-    pthread_rwlock_unlock(&board->board[old_index].lock); //lock posição de saída
-    pthread_rwlock_unlock(&board->board[new_index].lock);
+    if(new_index > old_index){
+        pthread_rwlock_unlock(&board->board[old_index].lock);
+        pthread_rwlock_unlock(&board->board[new_index].lock);
+    }
+    else{
+        pthread_rwlock_unlock(&board->board[new_index].lock);
+        pthread_rwlock_unlock(&board->board[old_index].lock);
+    }
 }
 
 // Helper private function to find and kill pacman at specific position
@@ -33,22 +39,21 @@ static int find_and_kill_pacman(board_t* board, int new_x, int new_y) {
         int px = pac->pos_x;
         int py = pac->pos_y;
         int alive = pac->alive;
+        pthread_rwlock_unlock(&pac->lock);
         if (px == new_x && py == new_y && alive) {
-            pthread_rwlock_unlock(&pac->lock);
             pthread_rwlock_wrlock(&pac->lock);
             pac->alive = 0;
             pthread_rwlock_unlock(&pac->lock);
             kill_pacman(board, p);
             return DEAD_PACMAN;
         }
-        pthread_rwlock_unlock(&pac->lock);
+        //pthread_rwlock_unlock(&pac->lock);
     }
     return VALID_MOVE;
 }
 
 // Helper private function for getting board position index
-//FIXMEEEEE
-int get_board_index(board_t* board, int x, int y) {
+static inline int get_board_index(board_t* board, int x, int y) {
     return y * board->width + x;
 }
 
@@ -66,20 +71,23 @@ void sleep_ms(int milliseconds) {
 
 int move_pacman(board_t* board, int pacman_index, command_t* command) {
 
-    pthread_rwlock_rdlock(&board->pacmans[pacman_index].lock);
-    if (pacman_index < 0 || !board->pacmans[pacman_index].alive) {
-        pthread_rwlock_unlock(&board->pacmans[pacman_index].lock);
-        return DEAD_PACMAN; // Invalid or dead pacman
+    if (pacman_index < 0 || pacman_index >= board->n_pacmans) {
+        return DEAD_PACMAN;
     }
-    pthread_rwlock_unlock(&board->pacmans[pacman_index].lock);
-
 
     pacman_t* pac = &board->pacmans[pacman_index];
-    debug("%d %d\n", pac->pos_x ,pac->pos_y);
-    pthread_rwlock_wrlock(&pac->lock);
+
+    // Ler estado inicial do pacman
+    pthread_rwlock_rdlock(&pac->lock);
+    int alive = pac->alive;
     int new_x = pac->pos_x;
     int new_y = pac->pos_y;
     pthread_rwlock_unlock(&pac->lock);
+
+    if (!alive) {
+        return DEAD_PACMAN;
+    }
+    //pthread_rwlock_wrlock(&board->board[get_board_index(board, new_x, new_y)].lock);
 
     // check passo
     if (pac->waiting > 0) {
@@ -115,10 +123,14 @@ int move_pacman(board_t* board, int pacman_index, command_t* command) {
                 command->turns_left = command->turns;
             }
             else command->turns_left -= 1;
+            //pthread_rwlock_unlock(&board->board[get_board_index(board, new_x, new_y)].lock);
             return VALID_MOVE;
         default:
+            //pthread_rwlock_unlock(&board->board[get_board_index(board, new_x, new_y)].lock);
             return INVALID_MOVE; // Invalid direction
     }
+
+    //pthread_rwlock_unlock(&board->board[get_board_index(board, new_x, new_y)].lock);
 
     // Logic for the WASD movement
     pac->current_move+=1;
@@ -388,11 +400,8 @@ int move_ghost(board_t* board, int ghost_index, command_t* command) {
     if (target_content == 'P') {
         result = find_and_kill_pacman(board, new_x, new_y);
     }
-    //pthread_mutex_lock(&board->ncurses_lock);
-    // Update board - clear old position (restore what was there)
+
     board->board[old_index].content = 'o'; // Or restore the dot if ghost was on one
-    //pthread_mutex_unlock(&board->ncurses_lock);
-    // Update ghost position
     ghost->pos_x = new_x;
     ghost->pos_y = new_y;
 
@@ -428,11 +437,11 @@ void* ghost_thread(void* thread_data) {
 void kill_pacman(board_t* board, int pacman_index) {
     debug("Killing %d pacman\n\n", pacman_index);
     pacman_t* pac = &board->pacmans[pacman_index];
-    pthread_rwlock_rdlock(&pac->lock);
+    //pthread_rwlock_wrlock(&pac->lock);
     int index = pac->pos_y * board->width + pac->pos_x;
-    pthread_rwlock_unlock(&pac->lock);
 
     //sempre que chamamos esta função já temos o lock para esta posição
+
     board->board[index].content = 'o';
     //pthread_mutex_unlock(&board->ncurses_lock);
     
@@ -463,20 +472,25 @@ int findFirstFreeSpot(board_t* board){
 int load_pacman(board_t* board, int points) {
     if(!strcmp(board->pacman_file, "")){
         board->n_pacmans = 1;
-        board->pacmans = (pacman_t*)calloc(board->n_pacmans, sizeof(pacman_t));
-        pacman_t *pacman = (pacman_t*)calloc(1, sizeof(pacman_t)); // Cria um Pacman inicializado
+        board->pacmans = (pacman_t*)calloc(1, sizeof(pacman_t));
+        pacman_t *pacman = &board->pacmans[0];
+
         int startIndex = findFirstFreeSpot(board);
+
         pacman->pos_y = startIndex / board->width;
         pacman->pos_x = startIndex % board->width;
-        debug("%d %d\n", pacman->pos_x, pacman->pos_y);
         pacman->alive = 1;
-        board->board[startIndex].content = 'P';
-        board->pacmans[0] = *pacman;
+        pacman->points = points;
+        pacman->waiting = 0;
+        pacman->n_moves = 0;
+        pacman->current_move = 0;
+        pacman->passo = 0;
+
         pthread_rwlock_init(&pacman->lock, NULL);
 
-
-    }else{
-        
+        board->board[startIndex].content = 'P';
+    }
+    else{    
         board->board[get_board_index(board,board->pacmans[0].pos_x, board->pacmans[0].pos_y)].content = 'P'; // Pacman
         board->pacmans[0].points = points;
     }
