@@ -22,19 +22,11 @@ void locksOrder(int new_index, int old_index, board_t* board){
 
 void unlockOrder(int new_index, int old_index, board_t* board){
     if(new_index > old_index){
-<<<<<<< HEAD
-        pthread_rwlock_unlock(&board->board[old_index].lock); //lock posição de saída
-        pthread_rwlock_unlock(&board->board[new_index].lock);
-    }
-    else{
-        pthread_rwlock_unlock(&board->board[new_index].lock); //lock posição de saída
-=======
         pthread_rwlock_unlock(&board->board[old_index].lock);
         pthread_rwlock_unlock(&board->board[new_index].lock);
     }
     else{
         pthread_rwlock_unlock(&board->board[new_index].lock);
->>>>>>> 2540fe4 (mega fixs)
         pthread_rwlock_unlock(&board->board[old_index].lock);
     }
 }
@@ -54,6 +46,7 @@ static int find_and_kill_pacman(board_t* board, int new_x, int new_y) {
             kill_pacman(board, p);
             return DEAD_PACMAN;
         }
+        //pthread_rwlock_unlock(&pac->lock);
     }
     return VALID_MOVE;
 }
