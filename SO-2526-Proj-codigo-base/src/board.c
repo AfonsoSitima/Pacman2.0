@@ -487,32 +487,9 @@ int findFirstFreeSpot(board_t* board){
 
 
 //Loading pacman points
-int load_pacman(board_t* board, int points) {
-    if(!strcmp(board->pacman_file, "")){
-        board->n_pacmans = 1;
-        board->pacmans = (pacman_t*)calloc(1, sizeof(pacman_t));
-        pacman_t *pacman = &board->pacmans[0];
-
-        int startIndex = findFirstFreeSpot(board);
-
-        pacman->pos_y = startIndex / board->width;
-        pacman->pos_x = startIndex % board->width;
-        pacman->alive = 1;
-        pacman->points = points;
-        pacman->waiting = 0;
-        pacman->n_moves = 0;
-        pacman->current_move = 0;
-        pacman->passo = 0;
-
-        pthread_rwlock_init(&pacman->lock, NULL);
-
-        board->board[startIndex].content = 'P';
-    }
-    else{    
-        board->board[get_board_index(board,board->pacmans[0].pos_x, board->pacmans[0].pos_y)].content = 'P'; // Pacman
-        board->pacmans[0].points = points;
-    }
-    return 0;
+void load_pacman(board_t* board, int points) {
+    board->board[get_board_index(board,board->pacmans[0].pos_x, board->pacmans[0].pos_y)].content = 'P'; // Pacman
+    board->pacmans[0].points = points;
 }
 
 int load_ghost(board_t* board, ghost_t* ghost){

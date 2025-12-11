@@ -350,6 +350,10 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
             }
         }
     }
+    //user input pacman initialization
+    if(strcmp(lvl->pacman_file, "") == 0){
+        userPacman(lvl);
+    }
     lvl->tid = malloc(lvl->n_ghosts * sizeof(pthread_t)); //alocar espaço para os tids das threads Ghosts
     pthread_mutex_init(&lvl->ncurses_lock, NULL); //lock do ncurses
     pthread_mutex_init(&lvl->state_lock, NULL);
@@ -359,6 +363,28 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
     free(buffer);
     close(fd); //close level file
     return lvl;
+}
+
+//inicializa pacman quando não há ficheiro .p
+void userPacman(board_t* board){
+    board->n_pacmans = 1;
+    board->pacmans = (pacman_t*)calloc(1, sizeof(pacman_t));
+    pacman_t *pacman = &board->pacmans[0];
+
+    int startIndex = findFirstFreeSpot(board);
+
+    pacman->pos_y = startIndex / board->width;
+    pacman->pos_x = startIndex % board->width;
+    pacman->alive = 1;
+    pacman->points = 0;
+    pacman->waiting = 0;
+    pacman->n_moves = 0;
+    pacman->current_move = 0;
+    pacman->passo = 0;
+
+    pthread_rwlock_init(&pacman->lock, NULL);
+
+    board->board[startIndex].content = 'P';
 }
 
 
@@ -710,7 +736,7 @@ int main(int argc, char** argv) {
                 game_board->active = 0;
                 pthread_join(game_board->ncursesTid, NULL);
                 stop_ghost_threads(game_board);
-                end_game = (createBackup(game_board) == 1) ? QUIT_GAME : CONTINUE_PLAY;
+                end_game = (createBackup(game_board) == 1) ? true : false;
                 if(end_game) {
                     screen_refresh(game_board, DRAW_GAME_OVER); 
                     sleep_ms(game_board->tempo);
