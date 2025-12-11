@@ -63,11 +63,13 @@ int play_board(board_t * game_board) {
     debug("KEY %c\n", play->command);
 
     if (play->command == 'G'){
+        if (pacman->n_moves != 0) pacman->current_move++;
         if(!*game_board->hasBackup){
             return CREATE_BACKUP;
         }
         
     }
+
     if (play->command == 'Q') {
         return QUIT_GAME;
     }
@@ -531,7 +533,7 @@ void* pacman_thread(void* arg) {
     board_t* board = data->board;
     while (1) {
         sleep_ms(board->tempo); 
-        int play = play_board(board); //talvez mudar isto para true se quiser backup automático
+        int play = play_board(board);
         if (play == CONTINUE_PLAY)
             continue;
         board->result = play;
@@ -624,7 +626,6 @@ int main(int argc, char** argv) {
                 tempPoints = game_board->pacmans[0].points;
                 end_game = (createBackup(game_board) == 1) ? true : false;
                 break;
-            //JÀ TA FEiTO
             case QUIT_GAME:
                 game_board->active = 0; 
                 pthread_join(game_board->ncursesTid, NULL);
@@ -637,7 +638,7 @@ int main(int argc, char** argv) {
             default:
                 break;
         }
-        //print_board(game_board);
+        print_board(game_board);
     }
     unload_allLevels(levels, indexLevel);
     free(hasBackUp);

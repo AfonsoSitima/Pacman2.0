@@ -10,7 +10,7 @@ BIN_DIR = bin
 INCLUDE_DIR = include
 # executable 
 TARGET = Pacmanist
-DIR_TARGET = levels
+DIR_TARGET = levels2
 
 # Objects variables
 OBJS = game.o display.o board.o
