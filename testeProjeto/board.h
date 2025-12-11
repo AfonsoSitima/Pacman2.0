@@ -61,7 +61,6 @@ typedef struct {
     char pacman_file[256];  // file with pacman movements
     char ghosts_files[MAX_GHOSTS][256]; // files with monster movements
     int tempo;              // Duration of each play
-    int hasBackup;
     pthread_t* tid; //tids of ghost threads
     pthread_mutex_t ncurses_lock;
     pthread_mutex_t state_lock;
@@ -69,28 +68,12 @@ typedef struct {
     int active; //nivel não mudou
     pthread_t pacTid; //tid of pacman thread
     pthread_t ncursesTid; //tid of ncurses thread
+    int result; 
+    int* hasBackup;
 
 } board_t;
 
-typedef struct {
-    int index;
-    board_t* board;
-    ghost_t* ghost;
-    command_t* moves;
-} thread_ghost_t;
 
-typedef struct {
-    board_t* board; 
-    int running;
-} thread_ncurses;
-
-typedef struct {
-    int index;
-    int hasBackup;
-    board_t* board;
-    pacman_t* pacman;
-    command_t* moves;
-} thread_pacman_t;
 
 
 /*Makes the current thread sleep for 'int milliseconds' miliseconds*/

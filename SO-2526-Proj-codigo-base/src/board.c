@@ -412,24 +412,6 @@ int move_ghost(board_t* board, int ghost_index, command_t* command) {
 }
 
 
-//É obrigatório ter esta função
-//ver onde por locks
-//thread a desbloquear a casa onde estava e a bloquear a casa para onde vai
-void* ghost_thread(void* thread_data) {
-    thread_ghost_t* data = (thread_ghost_t*)thread_data;
-    board_t* board = data->board;
-    int ghost_index = data->index; 
-    ghost_t* ghost = &board->ghosts[ghost_index];
-    while(1) { //Arranjar forma de ver se o pacman entrou no portal
-        pthread_mutex_lock(&board->state_lock);
-        int active = board->active;
-        pthread_mutex_unlock(&board->state_lock);
-        if (!active) break;
-        move_ghost(board, ghost_index, &ghost->moves[ghost->current_move % ghost->n_moves]);
-    }
-    free(data);
-    return NULL;
-}
 
 
 
@@ -503,7 +485,9 @@ int load_ghost(board_t* board, ghost_t* ghost){
     return 0;
 }
 
-int load_level(board_t *board, int points) {
+int load_level(board_t *board, int points, int* hasBackup) {
+    board->active = 1;
+    board->hasBackup = hasBackup;
     load_pacman(board, points);
     for(int i = 0; i < board->n_ghosts; i++){
         load_ghost(board, &board->ghosts[i]);

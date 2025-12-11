@@ -30,7 +30,7 @@ void screen_refresh(board_t * game_board, int mode) {
         sleep_ms(game_board->tempo);       
 }
 
-int play_board(board_t * game_board, bool hasBackUp) {
+int play_board(board_t * game_board) {
     pacman_t* pacman = &game_board->pacmans[0];
     command_t* play;
     command_t c;
@@ -52,7 +52,7 @@ int play_board(board_t * game_board, bool hasBackUp) {
     debug("KEY %c\n", play->command);
 
     if (play->command == 'G'){
-        if(!hasBackUp){
+        if(!*game_board->hasBackup){
             return CREATE_BACKUP;
         }
         
@@ -70,7 +70,7 @@ int play_board(board_t * game_board, bool hasBackUp) {
     }
 
     if(result == DEAD_PACMAN) {
-        if (hasBackUp) return LOAD_BACKUP;  //só funciona se o hasBackUp for aqui idk y
+        if (*game_board->hasBackup) return LOAD_BACKUP;  //só funciona se o hasBackUp for aqui idk y
         return QUIT_GAME;
     }
             
@@ -79,7 +79,7 @@ int play_board(board_t * game_board, bool hasBackUp) {
 
     if (!alive) {
         pthread_rwlock_unlock(&pacman->lock);
-        if (hasBackUp) return LOAD_BACKUP;
+        if (*game_board->hasBackup) return LOAD_BACKUP;
         return QUIT_GAME;
     }      //NAO SEI SE ISTO É PRECISO AQUI
     pthread_rwlock_unlock(&pacman->lock);
@@ -89,7 +89,7 @@ int play_board(board_t * game_board, bool hasBackUp) {
 
 
 
-int createBackup(board_t* board, bool* hasBackUp) {
+int createBackup(board_t* board) {
     pid_t pid;
     int status;
 
@@ -99,12 +99,12 @@ int createBackup(board_t* board, bool* hasBackUp) {
         perror("Fork Error");
         //falta os frees
     }
-    *hasBackUp = true;
+    *board->hasBackup = 1;
     if(pid == 0){
         terminal_init();
-        start_pacman_thread(board);
+        /*start_pacman_thread(board);
         start_ghost_threads(board);
-        start_ncurses_thread(board);
+        start_ncurses_thread(board);*/
     }
     else{
         wait(&status); 
@@ -115,10 +115,10 @@ int createBackup(board_t* board, bool* hasBackUp) {
             } 
             else if (code == 1) {
                 terminal_init();
-                start_pacman_thread(board);
+                /*start_pacman_thread(board);
                 start_ghost_threads(board);
-                start_ncurses_thread(board);
-                *hasBackUp = false;
+                start_ncurses_thread(board);*/
+                board->hasBackup = 0;
             }
         }
     }
@@ -293,6 +293,7 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
     lvl->tid = NULL;
     //lvl->ncursesDraw = DRAW_MENU; //inicial
     lvl->active = 1;
+    lvl->result = CONTINUE_PLAY;
     //Ya bro não sei se esta é a melhor solução
     //aqui tamos a ler linha por linha
     for (int i = 0; i < line_count; i++) {
@@ -442,21 +443,28 @@ void* ncurses_thread(void* arg) {
     thread_ncurses* data = (thread_ncurses *)arg;
     board_t* board = data->board;
 
-    while (1) {
+    while (board->active) {
         sleep_ms(board->tempo);
-        pthread_mutex_lock(&board->state_lock);
-        int active = board->active;
-        int running = data->running;
-        pthread_mutex_unlock(&board->state_lock);
-
-        if (!active || !running)
-            break;
-
         screen_refresh(board, DRAW_MENU);
     }
     return NULL;
 }
 
+//É obrigatório ter esta função
+//ver onde por locks
+//thread a desbloquear a casa onde estava e a bloquear a casa para onde vai
+void* ghost_thread(void* thread_data) {
+    thread_ghost_t* data = (thread_ghost_t*)thread_data;
+    board_t* board = data->board;
+    int ghost_index = data->index; 
+    ghost_t* ghost = &board->ghosts[ghost_index];
+    while(board->active) { //Arranjar forma de ver se o pacman entrou no portal
+        sleep_ms(ghost->passo);
+        move_ghost(board, ghost_index, &ghost->moves[ghost->current_move % ghost->n_moves]);
+    }
+    free(data);
+    return NULL;
+}
 
 /*int main(int argc, char** argv) {
     if (argc != 2) {
@@ -577,25 +585,14 @@ void* pacman_thread(void* arg) {
 
     while (1) {
         sleep_ms(board->pacmans[0].passo);        //pthread_mutex_lock(&board->state_lock);
-        int play = play_board(board, false); //talvez mudar isto para true se quiser backup automático
+        int play = play_board(board); //talvez mudar isto para true se quiser backup automático
         //pthread_mutex_unlock(&board->state_lock);
-        int result;
-        switch (play) {
-            case NEXT_LEVEL:
-                return NEXT_LEVEL;
-            case LOAD_BACKUP:
-                return LOAD_BACKUP;
-            case QUIT_GAME:
-                // Handle quit game logic if needed
-                return QUIT_GAME;
-            default:
-                result = CONTINUE_PLAY;
-                break;
-        }
-
-        // Implement pacman automatic movement here if needed
+        if (play == CONTINUE_PLAY)
+            continue;
+        
+        board->result = play;
+        return NULL;
     }
-    return CONTINUE_PLAY;
 }
 
 
@@ -624,12 +621,13 @@ int main(int argc, char** argv) {
     open_debug_file("debug.log");
 
     terminal_init();
-    
+    int result;
     int indexLevel = 0;
     board_t *game_board = NULL;
     int accumulated_points = 0;
     bool end_game = false;
-    bool hasBackUp = false;
+    int* hasBackUp = malloc(sizeof(int));
+    *hasBackUp = 0;
 
     
     board_t** levels = handle_files(argv[1]);
@@ -642,16 +640,19 @@ int main(int argc, char** argv) {
             break; 
         }
         game_board = levels[indexLevel];
-        
-        load_level(game_board, accumulated_points); //NO NOVO MÉTODO TEM DE ACUMULAR PONTOS
-        int result;
+        game_board->hasBackup = hasBackUp;
 
         
+        load_level(game_board, accumulated_points, hasBackUp); //NO NOVO MÉTODO TEM DE ACUMULAR PONTOS
+
+        //while(true)
         start_ncurses_thread(game_board);
         start_pacman_thread(game_board);
         start_ghost_threads(game_board);
 
-        pthread_join(game_board->pacTid, &result); //esperar pela thread do pacman
+        pthread_join(game_board->pacTid, NULL); //esperar pela thread do pacman
+
+        result = game_board->result;
 
         switch (result) {
             case NEXT_LEVEL:
@@ -672,11 +673,16 @@ int main(int argc, char** argv) {
                 exit(1);  //o filho morre
                 break;
             case CREATE_BACKUP:
+                game_board->active = 0;
                 pthread_join(game_board->ncursesTid, NULL);
                 stop_ghost_threads(game_board);
-                end_game = (createBackup(game_board, &hasBackUp) == 1) ? QUIT_GAME : CONTINUE_PLAY;
+                end_game = (createBackup(game_board) == 1) ? QUIT_GAME : CONTINUE_PLAY;
+                if(end_game) {
+                    screen_refresh(game_board, DRAW_GAME_OVER); 
+                    sleep_ms(game_board->tempo);
+                }
                 break;
-            
+            //JÀ TA FEiTO
             case QUIT_GAME:
                 game_board->active = 0; 
                 pthread_join(game_board->ncursesTid, NULL);
@@ -691,11 +697,10 @@ int main(int argc, char** argv) {
         }
 
         //print_board(game_board);
-        
     }
     unload_allLevels(levels, indexLevel);
+    free(hasBackUp);
     terminal_cleanup();
-
     close_debug_file();
 
     return 0;
