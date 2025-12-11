@@ -96,6 +96,7 @@ int move_pacman(board_t* board, int pacman_index, command_t* command) {
     pac->waiting = pac->passo;
 
     char direction = command->command;
+    debug("PACMAN MOVE: %c\n", direction);
 
     if (direction == 'R') {
         char directions[] = {'W', 'S', 'A', 'D'};
@@ -140,7 +141,7 @@ int move_pacman(board_t* board, int pacman_index, command_t* command) {
         return INVALID_MOVE;
     }
 
-
+    debug("PACMAN NEW POS: %d %d\n", new_x, new_y);
 
     int new_index = get_board_index(board, new_x, new_y);
     int old_index = get_board_index(board, pac->pos_x, pac->pos_y);

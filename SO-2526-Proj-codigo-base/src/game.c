@@ -34,12 +34,23 @@ int play_board(board_t * game_board) {
     pacman_t* pacman = &game_board->pacmans[0];
     command_t* play;
     command_t c;
+
+    pthread_rwlock_rdlock(&pacman->lock);
+    int alive = pacman->alive;
+    pthread_rwlock_unlock(&pacman->lock);
+
+    if (!alive) {
+        if (*game_board->hasBackup) return LOAD_BACKUP;
+        return QUIT_GAME;
+    }
+
     if (pacman->n_moves == 0) { // if is user input
         c.command = get_input();
-        
-        if(c.command == '\0')
-            return CONTINUE_PLAY;
 
+        if(c.command == '\0') {
+            debug("NO INPUT\n");
+            return CONTINUE_PLAY;
+        }
         c.turns = 1;
         play = &c;
     }
@@ -57,7 +68,6 @@ int play_board(board_t * game_board) {
         }
         
     }
-
     if (play->command == 'Q') {
         return QUIT_GAME;
     }
@@ -75,7 +85,7 @@ int play_board(board_t * game_board) {
     }
             
     pthread_rwlock_rdlock(&pacman->lock);
-    int alive = pacman->alive;
+    alive = pacman->alive;
 
     if (!alive) {
         pthread_rwlock_unlock(&pacman->lock);
@@ -500,7 +510,7 @@ void* ghost_thread(void* thread_data) {
     int ghost_index = data->index; 
     ghost_t* ghost = &board->ghosts[ghost_index];
     while(board->active) { //Arranjar forma de ver se o pacman entrou no portal
-        sleep_ms(ghost->passo);
+        sleep_ms(board->tempo);
         move_ghost(board, ghost_index, &ghost->moves[ghost->current_move % ghost->n_moves]);
     }
     free(data);
@@ -518,14 +528,11 @@ void start_ncurses_thread(board_t* board) {
 void* pacman_thread(void* arg) {
     thread_pacman_t* data = arg;
     board_t* board = data->board;
-
     while (1) {
-        sleep_ms(board->pacmans[0].passo);        //pthread_mutex_lock(&board->state_lock);
+        sleep_ms(board->tempo); 
         int play = play_board(board); //talvez mudar isto para true se quiser backup automático
-        //pthread_mutex_unlock(&board->state_lock);
         if (play == CONTINUE_PLAY)
             continue;
-        
         board->result = play;
         return NULL;
     }
