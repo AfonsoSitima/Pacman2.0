@@ -1,0 +1,7 @@
+PASSO 1
+POS 8 8
+W
+A
+S
+D
+#T 5

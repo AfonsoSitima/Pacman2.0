@@ -24,10 +24,12 @@
 
 void screen_refresh(board_t * game_board, int mode) {
     //debug("REFRESH\n");
+    pthread_mutex_lock(&game_board->ncurses_lock);
     draw_board(game_board, mode);
     refresh_screen();
     if(game_board->tempo != 0)
-        sleep_ms(game_board->tempo);       
+        sleep_ms(game_board->tempo);    
+    pthread_mutex_unlock(&game_board->ncurses_lock);   
 }
 
 int play_board(board_t * game_board) {
@@ -45,7 +47,9 @@ int play_board(board_t * game_board) {
     }
 
     if (pacman->n_moves == 0) { // if is user input
+        pthread_mutex_lock(&game_board->ncurses_lock);
         c.command = get_input();
+        pthread_mutex_unlock(&game_board->ncurses_lock);
 
         if(c.command == '\0') {
             debug("NO INPUT\n");
@@ -113,14 +117,10 @@ int createBackup(board_t* board) {
     }
     *board->hasBackup = 1;
     if(pid == 0){
-        terminal_init();
-        /*start_pacman_thread(board);
-        start_ghost_threads(board);
-        start_ncurses_thread(board);*/
+        //No Filho
     }
     else{
         wait(&status); 
-        //debug("Backup process ended with status: %d\n", WEXITSTATUS(status));
         if (WIFEXITED(status)) {                 // saiu normalmente
             int code = WEXITSTATUS(status);      // código do exit
             if (code == 0) {
@@ -128,9 +128,6 @@ int createBackup(board_t* board) {
             } 
             else if (code == 1) {
                 terminal_init();
-                /*start_pacman_thread(board);
-                start_ghost_threads(board);
-                start_ncurses_thread(board);*/
                 *board->hasBackup = 0;
             }
         }
@@ -224,6 +221,7 @@ ghost_t* parseMonster(char* filename, char* dirpath){
         }
         else {
             sscanf(lines[i], "%c%d", &monster->moves[monster->n_moves].command, &monster->moves[monster->n_moves].turns_left);
+            monster->moves[monster->n_moves].turns = 1;
             monster->n_moves++;
         }
     }
@@ -268,7 +266,8 @@ pacman_t* parsePacman(char* filename, char* dirpath){
             continue;
         }
         else {
-            sscanf(lines[i], "%c%d", &pacman->moves[pacman->n_moves].command, &pacman->moves[pacman->n_moves].turns_left);
+            sscanf(lines[i], "%c %d", &pacman->moves[pacman->n_moves].command, &pacman->moves[pacman->n_moves].turns_left);
+            pacman->moves[pacman->n_moves].turns = 1;
             pacman->n_moves++;
         }
     }
@@ -443,8 +442,10 @@ board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil cons
                 //ver o que fazer aqui
             }
             levels = tempLevels; //realoc to original array;
+            //free(tempLevels);
             levels[numLevels] = parseLvl(path, dirpath);
             numLevels++; //novo nível
+            
         }
 
     }
@@ -501,6 +502,7 @@ void* ncurses_thread(void* arg) {
         sleep_ms(board->tempo);
         screen_refresh(board, DRAW_MENU);
     }
+    free(data);
     return NULL;
 }
 
@@ -537,6 +539,7 @@ void* pacman_thread(void* arg) {
         if (play == CONTINUE_PLAY)
             continue;
         board->result = play;
+        free(data);
         return NULL;
     }
 }
