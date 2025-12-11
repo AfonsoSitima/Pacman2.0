@@ -350,6 +350,10 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
             }
         }
     }
+    //user input pacman initialization
+    if(strcmp(lvl->pacman_file, "") == 0){
+        userPacman(lvl);
+    }
     lvl->tid = malloc(lvl->n_ghosts * sizeof(pthread_t)); //alocar espaço para os tids das threads Ghosts
     pthread_mutex_init(&lvl->ncurses_lock, NULL); //lock do ncurses
     pthread_mutex_init(&lvl->state_lock, NULL);
@@ -358,6 +362,28 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
     free(buffer);
     close(fd); //close level file
     return lvl;
+}
+
+//inicializa pacman quando não há ficheiro .p
+void userPacman(board_t* board){
+    board->n_pacmans = 1;
+    board->pacmans = (pacman_t*)calloc(1, sizeof(pacman_t));
+    pacman_t *pacman = &board->pacmans[0];
+
+    int startIndex = findFirstFreeSpot(board);
+
+    pacman->pos_y = startIndex / board->width;
+    pacman->pos_x = startIndex % board->width;
+    pacman->alive = 1;
+    pacman->points = 0;
+    pacman->waiting = 0;
+    pacman->n_moves = 0;
+    pacman->current_move = 0;
+    pacman->passo = 0;
+
+    pthread_rwlock_init(&pacman->lock, NULL);
+
+    board->board[startIndex].content = 'P';
 }
 
 
@@ -437,6 +463,29 @@ void stop_ghost_threads(board_t* board) {
 
 }
 
+void start_pacman_thread(board_t* board) {
+    
+    thread_pacman_t* thread_data = malloc(sizeof(thread_pacman_t));
+    thread_data->index = 0; 
+    thread_data->board = board;
+    thread_data->moves = board->pacmans[0].moves;
+    pthread_create(&board->pacTid, NULL, (void*) pacman_thread, thread_data);
+    
+}
+void stop_pacman_thread(board_t* board) {
+    pthread_join(board->pacTid, NULL);
+    
+}
+
+void* ncurses_thread(void* arg) {
+    thread_ncurses* data = arg;
+    board_t* board = data->board;
+
+    while (data->running && board->active) {
+        screen_refresh(board, DRAW_MENU);
+    }
+    return NULL;
+}
 
 
 void* ncurses_thread(void* arg) {
@@ -511,7 +560,20 @@ void* ghost_thread(void* thread_data) {
 
         //refresh_screen();
 
-        
+        //tart_ncurses_thread(game_board);
+
+        //draw_board(game_board, DRAW_MENU);
+
+        //refresh_screen();
+
+        //tart_ncurses_thread(game_board);
+
+        //draw_board(game_board, DRAW_MENU);
+
+        //refresh_screen();
+        if(strcmp(game_board->pacman_file, "")){
+            start_pacman_thread(game_board);
+        }
         start_ghost_threads(game_board); //talvez começar isto no load_level????
         while(true) {
             
@@ -560,6 +622,9 @@ void* ghost_thread(void* thread_data) {
             accumulated_points = game_board->pacmans[0].points;      
         }
         stop_ghost_threads(game_board);
+        if(strcmp(game_board->pacman_file, "")){
+            stop_pacman_thread(game_board);
+        }
         print_board(game_board);
         unload_level(game_board);
         

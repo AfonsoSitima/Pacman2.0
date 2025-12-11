@@ -30,7 +30,6 @@ void unlockOrder(int new_index, int old_index, board_t* board){
         pthread_rwlock_unlock(&board->board[old_index].lock);
     }
 }
-
 // Helper private function to find and kill pacman at specific position
 static int find_and_kill_pacman(board_t* board, int new_x, int new_y) {
     for (int p = 0; p < board->n_pacmans; p++) {
@@ -47,6 +46,7 @@ static int find_and_kill_pacman(board_t* board, int new_x, int new_y) {
             kill_pacman(board, p);
             return DEAD_PACMAN;
         }
+        //pthread_rwlock_unlock(&pac->lock);
     }
     return VALID_MOVE;
 }
@@ -148,7 +148,7 @@ int move_pacman(board_t* board, int pacman_index, command_t* command) {
     locksOrder(new_index, old_index, board);
 
     char target_content = board->board[new_index].content;
-
+ 
     if (board->board[new_index].has_portal) {
         board->board[old_index].content = 'o';
         board->board[new_index].content = 'P';
@@ -181,7 +181,7 @@ int move_pacman(board_t* board, int pacman_index, command_t* command) {
     board->board[new_index].content = 'P';
     unlockOrder(new_index, old_index, board);
 
-
+    sleep_ms(board->tempo);
     return VALID_MOVE;
 }
 
@@ -313,8 +313,9 @@ int move_ghost_charged(board_t* board, int ghost_index, char direction) {
     ghost->pos_x = new_x;
     ghost->pos_y = new_y;
     // Update board - set new position
+    pthread_mutex_lock(&board->ncurses_lock);
     board->board[new_index].content = 'M';
-
+    pthread_mutex_unlock(&board->ncurses_lock);
     unlockOrder(new_index, old_index, board);
 
     return result;
@@ -382,7 +383,6 @@ int move_ghost(board_t* board, int ghost_index, command_t* command) {
     // Check board position
     int new_index = get_board_index(board, new_x, new_y);
     int old_index = get_board_index(board, ghost->pos_x, ghost->pos_y);
-
     locksOrder(new_index, old_index, board);
 
     char target_content = board->board[new_index].content;
@@ -410,7 +410,6 @@ int move_ghost(board_t* board, int ghost_index, command_t* command) {
     unlockOrder(new_index, old_index, board);
     return result;
 }
-
 
 
 
@@ -450,32 +449,9 @@ int findFirstFreeSpot(board_t* board){
 
 
 //Loading pacman points
-int load_pacman(board_t* board, int points) {
-    if(!strcmp(board->pacman_file, "")){
-        board->n_pacmans = 1;
-        board->pacmans = (pacman_t*)calloc(1, sizeof(pacman_t));
-        pacman_t *pacman = &board->pacmans[0];
-
-        int startIndex = findFirstFreeSpot(board);
-
-        pacman->pos_y = startIndex / board->width;
-        pacman->pos_x = startIndex % board->width;
-        pacman->alive = 1;
-        pacman->points = points;
-        pacman->waiting = 0;
-        pacman->n_moves = 0;
-        pacman->current_move = 0;
-        pacman->passo = 0;
-
-        pthread_rwlock_init(&pacman->lock, NULL);
-
-        board->board[startIndex].content = 'P';
-    }
-    else{    
-        board->board[get_board_index(board,board->pacmans[0].pos_x, board->pacmans[0].pos_y)].content = 'P'; // Pacman
-        board->pacmans[0].points = points;
-    }
-    return 0;
+void load_pacman(board_t* board, int points) {
+    board->board[get_board_index(board,board->pacmans[0].pos_x, board->pacmans[0].pos_y)].content = 'P'; // Pacman
+    board->pacmans[0].points = points;
 }
 
 int load_ghost(board_t* board, ghost_t* ghost){
@@ -519,7 +495,6 @@ void unload_level(board_t *level) {
 }
 void unload_allLevels(board_t **levels, int currentLevel){
     for(int level = currentLevel; levels[level]; level++){
-        
         levels[level] = NULL;
     }
     free(levels);
