@@ -23,7 +23,6 @@
 
 
 void screen_refresh(board_t * game_board, int mode) {
-    //debug("REFRESH\n");
     pthread_mutex_lock(&game_board->ncurses_lock);
     draw_board(game_board, mode);
     refresh_screen();
@@ -103,27 +102,25 @@ int play_board(board_t * game_board) {
 }
 
 
-
-
 int createBackup(board_t* board) {
     pid_t pid;
     int status;
 
-    terminal_cleanup();
     pid = fork();
     if(pid == -1){
         perror("Fork Error");
-        //falta os frees
     }
     *board->hasBackup = 1;
     if(pid == 0){
-        //No Filho
+        return CONTINUE_PLAY;
     }
     else{
-        wait(&status); 
+        wait(&status);
+        terminal_cleanup(); 
         if (WIFEXITED(status)) {                 // saiu normalmente
             int code = WEXITSTATUS(status);      // código do exit
             if (code == 0) {
+
                 return END_GAME;
             } 
             else if (code == 1) {
@@ -319,9 +316,13 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
         
         else if (strncmp(lines[i], "PAC", 3) == 0) { 
             sscanf(lines[i], "PAC %s", lvl->pacman_file);
-            lvl->pacmans = realloc(lvl->pacmans, (lvl->n_pacmans + 1) * sizeof(pacman_t));
-            lvl->pacmans[0] = *parsePacman(lvl->pacman_file, dirpath); //ver se há malloc error aqui
-            lvl->n_pacmans++; //não tenho a certeza se é suposto haver mais que 1 pacman
+            pacman_t* tempPacman = parsePacman(lvl->pacman_file, dirpath);
+            if(tempPacman){
+                lvl->pacmans = realloc(lvl->pacmans, (lvl->n_pacmans + 1) * sizeof(pacman_t));
+                lvl->pacmans[lvl->n_pacmans] = *tempPacman;
+                free(tempPacman);
+                lvl->n_pacmans++;
+            }
         }
         
         else if (strncmp(lines[i], "MON", 3) == 0) {
@@ -334,16 +335,17 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
             ghost_file = strtok_r(ghost_files, " ", &saveptr);
 
             while (ghost_file != NULL) {
-                lvl->ghosts = realloc(lvl->ghosts, (lvl->n_ghosts + 1) * sizeof(ghost_t));
-
-                if (!lvl->ghosts) {
-                    // trata erro de memória se quiseres
-                    break;
-                }
-
-
-                lvl->ghosts[lvl->n_ghosts] = *parseMonster(ghost_file, dirpath);
-
+                ghost_t* tempGhost = parseMonster(ghost_file, dirpath);
+                if(tempGhost){
+                    lvl->ghosts = realloc(lvl->ghosts, (lvl->n_ghosts + 1) * sizeof(ghost_t));
+                    if(!lvl->ghosts){
+                        free(tempGhost);
+                        fprintf(stderr, "realloc ghosts");
+                    }else{
+                        lvl->ghosts[lvl->n_ghosts] = *tempGhost;
+                        free(tempGhost);
+                    }
+                }       
                 strcpy(lvl->ghosts_files[lvl->n_ghosts], ghost_file);
                 lvl->n_ghosts++;
 
@@ -594,7 +596,7 @@ int main(int argc, char** argv) {
         
         load_level(game_board, hasBackUp, tempPoints); //NO NOVO MÉTODO TEM DE ACUMULAR PONTOS
 
-        //while(true)
+
         start_ncurses_thread(game_board);
         start_pacman_thread(game_board);
         start_ghost_threads(game_board);
@@ -612,7 +614,6 @@ int main(int argc, char** argv) {
                 sleep_ms(game_board->tempo); 
                 tempPoints = game_board->pacmans[0].points;
                 indexLevel++;
-                //unload_level(game_board);
                 break;
             
             case LOAD_BACKUP:
@@ -634,7 +635,6 @@ int main(int argc, char** argv) {
                 pthread_join(game_board->ncursesTid, NULL);
                 stop_ghost_threads(game_board);
                 screen_refresh(game_board, DRAW_GAME_OVER); 
-                unload_level(game_board);
                 sleep_ms(game_board->tempo);
                 end_game = true;
                 break;
@@ -643,7 +643,7 @@ int main(int argc, char** argv) {
         }
         print_board(game_board);
     }
-    unload_allLevels(levels, indexLevel);
+    unload_allLevels(levels);
     free(hasBackUp);
     terminal_cleanup();
     close_debug_file();

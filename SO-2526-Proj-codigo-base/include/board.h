@@ -116,7 +116,7 @@ void freeLevel(board_t *level);
 void unload_level(board_t * board);
 
 /*DOCUMENTAR!!!!! */
-void unload_allLevels(board_t **levels, int currentLevel);
+void unload_allLevels(board_t **levels);
 
 
 // DEBUG FILE

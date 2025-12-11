@@ -1,7 +1,3 @@
 PASSO 1
 POS 7 7
-W
-A
-S
-D
-#T 5
+R

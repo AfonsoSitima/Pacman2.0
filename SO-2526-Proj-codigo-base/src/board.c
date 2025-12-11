@@ -476,11 +476,12 @@ int load_level(board_t *board, int* hasBackup, int accPoints) {
 
 
 //free level
+//free level
 void freeLevel(board_t *level){
     if (level->board != NULL){
         for(int i = 0; i < level->width * level->height; i++){
             pthread_rwlock_destroy(&level->board[i].lock);
-            
+
         }
         //pthread_mutex_destroy(&level->ncurses_lock); // destruir o lock
         free(level->board); 
@@ -489,14 +490,20 @@ void freeLevel(board_t *level){
     if (level->ghosts != NULL) free(level->ghosts);
     if (level->tid != NULL) free(level->tid);
     pthread_mutex_destroy(&level->ncurses_lock); // destruir o ncurses lock
+    pthread_mutex_destroy(&level->state_lock); // destruir o state lock
     free(level);
 }
+
 void unload_level(board_t *level) {
     freeLevel(level);
-    
 }
-void unload_allLevels(board_t **levels, int currentLevel){
-    for(int level = currentLevel; levels[level]; level++){
+
+
+void unload_allLevels(board_t **levels){
+
+    if(!levels) return;
+    for(int level = 0; levels[level]; level++){
+        unload_level(levels[level]);
         levels[level] = NULL;
     }
     free(levels);
