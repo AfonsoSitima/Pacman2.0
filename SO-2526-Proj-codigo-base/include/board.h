@@ -65,7 +65,6 @@ typedef struct {
     char ghosts_files[MAX_GHOSTS][256]; // files with monster movements
     int tempo;              // Duration of each play
     pthread_t* tid; //tids of ghost threads
-    pthread_t pacTid; //tid of pacman thread
     pthread_mutex_t ncurses_lock;
     pthread_mutex_t state_lock;
     //int ncursesDraw; //o que é preciso dar draw
@@ -93,12 +92,7 @@ void* pacman_thread(void* thread_data);
 /*Process the death of a Pacman*/
 void kill_pacman(board_t* board, int pacman_index);
 
-<<<<<<< HEAD
-//aux para encontrar primeira casa livre para posicionar pacman
-int findFreePosition(board_t* board, int* x, int* y);
-=======
 int findFirstFreeSpot(board_t* board);
->>>>>>> 75c35dc (pacman user)
 
 /*Adds a pacman to the board*/
 void load_pacman(board_t* board, int points);

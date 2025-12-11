@@ -108,6 +108,7 @@ int createBackup(board_t* board) {
     }
     else{
         wait(&status); 
+        //debug("Backup process ended with status: %d\n", WEXITSTATUS(status));
         if (WIFEXITED(status)) {                 // saiu normalmente
             int code = WEXITSTATUS(status);      // código do exit
             if (code == 0) {
@@ -463,7 +464,7 @@ void stop_ghost_threads(board_t* board) {
 
 }
 
-void start_pacman_thread(board_t* board) {
+/*void start_pacman_thread(board_t* board) {
     
     thread_pacman_t* thread_data = malloc(sizeof(thread_pacman_t));
     thread_data->index = 0; 
@@ -475,17 +476,8 @@ void start_pacman_thread(board_t* board) {
 void stop_pacman_thread(board_t* board) {
     pthread_join(board->pacTid, NULL);
     
-}
+}*/
 
-void* ncurses_thread(void* arg) {
-    thread_ncurses* data = arg;
-    board_t* board = data->board;
-
-    while (data->running && board->active) {
-        screen_refresh(board, DRAW_MENU);
-    }
-    return NULL;
-}
 
 
 void* ncurses_thread(void* arg) {
