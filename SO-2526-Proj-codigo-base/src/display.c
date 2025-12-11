@@ -130,11 +130,8 @@ void draw_board(board_t* board, int mode) {
 
     // Desenhar pontuação no fundo
     attron(COLOR_PAIR(5));
-    int points = 0;
-    /*if (board->n_pacmans > 0) {
-        points = board->pacmans[0].points; // assumimos primeiro pacman
-    }*/
-    mvprintw(start_row + board->height + 1, 0, "Points: %d", points);
+
+    mvprintw(start_row + board->height + 1, 0, "Points: %d", board->pacmans[0].points);
     attroff(COLOR_PAIR(5));
 
     pthread_mutex_unlock(&board->ncurses_lock);

@@ -73,6 +73,7 @@ typedef struct {
     pthread_t ncursesTid; //tid of ncurses thread
     int result; 
     int* hasBackup;
+    int accumulated_points;
 
 } board_t;
 
@@ -95,13 +96,13 @@ void kill_pacman(board_t* board, int pacman_index);
 int findFirstFreeSpot(board_t* board);
 
 /*Adds a pacman to the board*/
-void load_pacman(board_t* board, int points);
+void load_pacman(board_t* board);
 
 /*Adds a ghost(monster) to the board*/
 int load_ghost(board_t* board, ghost_t* ghost);
 
 /*Loads a level into board*/
-int load_level(board_t* board, int accumulated_points, int* hasBackup);
+int load_level(board_t* board, int* hasBackup, int accPoints);
 
 void freePac(pacman_t *pacman);
 

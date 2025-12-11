@@ -295,6 +295,7 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
     //lvl->ncursesDraw = DRAW_MENU; //inicial
     lvl->active = 1;
     lvl->result = CONTINUE_PLAY;
+    lvl->accumulated_points = 0;
     //Ya bro não sei se esta é a melhor solução
     //aqui tamos a ler linha por linha
     for (int i = 0; i < line_count; i++) {
@@ -520,9 +521,11 @@ void* pacman_thread(void* arg) {
     board_t* board = data->board;
 
     while (1) {
+        debug("-----%d\n", board->pacmans[0].points);
         sleep_ms(board->pacmans[0].passo);        //pthread_mutex_lock(&board->state_lock);
         int play = play_board(board); //talvez mudar isto para true se quiser backup automático
         //pthread_mutex_unlock(&board->state_lock);
+        board->accumulated_points = board->pacmans[0].points;
         if (play == CONTINUE_PLAY)
             continue;
         
@@ -559,8 +562,8 @@ int main(int argc, char** argv) {
     terminal_init();
     int result;
     int indexLevel = 0;
+    int tempPoints = 0; //acumular entre niveis
     board_t *game_board = NULL;
-    int accumulated_points = 0;
     bool end_game = false;
     int* hasBackUp = malloc(sizeof(int));
     *hasBackUp = 0;
@@ -579,7 +582,7 @@ int main(int argc, char** argv) {
         game_board->hasBackup = hasBackUp;
 
         
-        load_level(game_board, accumulated_points, hasBackUp); //NO NOVO MÉTODO TEM DE ACUMULAR PONTOS
+        load_level(game_board, hasBackUp, tempPoints); //NO NOVO MÉTODO TEM DE ACUMULAR PONTOS
 
         //while(true)
         start_ncurses_thread(game_board);
@@ -597,6 +600,7 @@ int main(int argc, char** argv) {
                 stop_ghost_threads(game_board);
                 screen_refresh(game_board, DRAW_WIN);
                 sleep_ms(game_board->tempo); 
+                tempPoints = game_board->pacmans[0].points;
                 indexLevel++;
                 //unload_level(game_board);
                 break;
@@ -612,22 +616,22 @@ int main(int argc, char** argv) {
                 game_board->active = 0;
                 pthread_join(game_board->ncursesTid, NULL);
                 stop_ghost_threads(game_board);
-                end_game = (createBackup(game_board) == 1) ? QUIT_GAME : CONTINUE_PLAY;
+                tempPoints = game_board->pacmans[0].points;
+                end_game = (createBackup(game_board) == 1) ? true : false;
                 break;
             //JÀ TA FEiTO
             case QUIT_GAME:
                 game_board->active = 0; 
                 pthread_join(game_board->ncursesTid, NULL);
                 stop_ghost_threads(game_board);
-                unload_level(game_board);
                 screen_refresh(game_board, DRAW_GAME_OVER); 
+                unload_level(game_board);
                 sleep_ms(game_board->tempo);
                 end_game = true;
                 break;
             default:
                 break;
         }
-
         //print_board(game_board);
     }
     unload_allLevels(levels, indexLevel);
