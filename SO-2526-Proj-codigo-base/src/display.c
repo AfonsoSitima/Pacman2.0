@@ -2,6 +2,7 @@
 #include "board.h"
 #include <stdlib.h>
 #include <ctype.h>
+#include <pthread.h>
 
 
 int terminal_init() {
@@ -19,7 +20,6 @@ int terminal_init() {
 
     // Make getch() non-blocking (return ERR if no input)
     nodelay(stdscr, TRUE); // Uncomment if non-blocking input is desired
-    //timeout(150); // Set getch() to wait max 100ms for input
 
     // Hide the cursor
     curs_set(0);
@@ -131,8 +131,11 @@ void draw_board(board_t* board, int mode) {
 
     // Desenhar pontuação no fundo
     attron(COLOR_PAIR(5));
+    pthread_rwlock_rdlock(&board->pacmans[0].lock);
+    int points = board->pacmans[0].points;
+    pthread_rwlock_unlock(&board->pacmans[0].lock);
 
-    mvprintw(start_row + board->height + 1, 0, "Points: %d", board->pacmans[0].points);
+    mvprintw(start_row + board->height + 1, 0, "Points: %d", points);
     attroff(COLOR_PAIR(5));
 
     //pthread_mutex_unlock(&board->ncurses_lock);

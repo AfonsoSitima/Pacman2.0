@@ -120,7 +120,6 @@ int createBackup(board_t* board) {
         if (WIFEXITED(status)) {                 // saiu normalmente
             int code = WEXITSTATUS(status);      // código do exit
             if (code == 0) {
-
                 return END_GAME;
             } 
             else if (code == 1) {
@@ -371,7 +370,7 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
     }
     lvl->tid = malloc(lvl->n_ghosts * sizeof(pthread_t)); //alocar espaço para os tids das threads Ghosts
     pthread_mutex_init(&lvl->ncurses_lock, NULL); //lock do ncurses
-    pthread_mutex_init(&lvl->state_lock, NULL);
+    pthread_rwlock_init(&lvl->board_lock, NULL); //lock do board
 
     free(lines);
     free(buffer);
@@ -473,6 +472,8 @@ void start_ghost_threads(board_t* board) {    //trata de todas a threads dos gho
         pthread_create(&board->tid[i], NULL, (void*) ghost_thread, thread_data);
     }
 }
+
+
 void stop_ghost_threads(board_t* board) {
     for(int i = 0; i < board->n_ghosts; i++) {
         pthread_join(board->tid[i], NULL);
@@ -499,10 +500,16 @@ void stop_pacman_thread(board_t* board) {
 void* ncurses_thread(void* arg) {
     thread_ncurses* data = (thread_ncurses *)arg;
     board_t* board = data->board;
-
-    while (board->active) {
+    int active = 1;
+    while (1) {
         sleep_ms(board->tempo);
         screen_refresh(board, DRAW_MENU);
+        pthread_rwlock_rdlock(&board->board_lock);
+        active = board->active;
+        pthread_rwlock_unlock(&board->board_lock);
+        if (!active) {
+            break;
+        }
     }
     free(data);
     return NULL;
@@ -516,9 +523,16 @@ void* ghost_thread(void* thread_data) {
     board_t* board = data->board;
     int ghost_index = data->index; 
     ghost_t* ghost = &board->ghosts[ghost_index];
-    while(board->active) { //Arranjar forma de ver se o pacman entrou no portal
+    int active = 1;
+    while(1) { //Arranjar forma de ver se o pacman entrou no portal
         sleep_ms(board->tempo);
         move_ghost(board, ghost_index, &ghost->moves[ghost->current_move % ghost->n_moves]);
+        pthread_rwlock_rdlock(&board->board_lock);
+        active = board->active;
+        pthread_rwlock_unlock(&board->board_lock);
+        if (!active) {
+            break;
+        }
     }
     free(data);
     return NULL;
@@ -605,11 +619,15 @@ int main(int argc, char** argv) {
 
         result = game_board->result;
 
+        pthread_rwlock_wrlock(&game_board->board_lock);
+        game_board->active = 0;
+        pthread_rwlock_unlock(&game_board->board_lock);
+        
+        pthread_join(game_board->ncursesTid, NULL);
+        stop_ghost_threads(game_board);
+
         switch (result) {
             case NEXT_LEVEL:
-                game_board->active = 0;
-                pthread_join(game_board->ncursesTid, NULL);
-                stop_ghost_threads(game_board);
                 screen_refresh(game_board, DRAW_WIN);
                 sleep_ms(game_board->tempo); 
                 tempPoints = game_board->pacmans[0].points;
@@ -617,23 +635,14 @@ int main(int argc, char** argv) {
                 break;
             
             case LOAD_BACKUP:
-                game_board->active = 0;
-                pthread_join(game_board->ncursesTid, NULL);
-                stop_ghost_threads(game_board);
                 terminal_cleanup();
                 exit(1);  //o filho morre
                 break;
             case CREATE_BACKUP:
-                game_board->active = 0;
-                pthread_join(game_board->ncursesTid, NULL);
-                stop_ghost_threads(game_board);
                 tempPoints = game_board->pacmans[0].points;
                 end_game = (createBackup(game_board) == 1) ? true : false;
                 break;
             case QUIT_GAME:
-                game_board->active = 0; 
-                pthread_join(game_board->ncursesTid, NULL);
-                stop_ghost_threads(game_board);
                 screen_refresh(game_board, DRAW_GAME_OVER); 
                 sleep_ms(game_board->tempo);
                 end_game = true;

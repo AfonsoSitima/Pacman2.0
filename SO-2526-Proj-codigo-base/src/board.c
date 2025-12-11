@@ -9,6 +9,46 @@
 FILE * debugfile;
 
 
+
+// Helper private function to find and kill pacman at specific position
+static int find_and_kill_pacman(board_t* board, int new_x, int new_y) {
+    //every time we call this function we already have the lock for the board position
+    for (int p = 0; p < board->n_pacmans; p++) {
+        pacman_t* pac = &board->pacmans[p];
+        pthread_rwlock_rdlock(&pac->lock);
+        int px = pac->pos_x;
+        int py = pac->pos_y;
+        int alive = pac->alive;
+        pthread_rwlock_unlock(&pac->lock);
+        if (px == new_x && py == new_y && alive) {
+            pthread_rwlock_wrlock(&pac->lock);
+            pac->alive = 0;
+            pthread_rwlock_unlock(&pac->lock);
+            kill_pacman(board, p);
+            return DEAD_PACMAN;
+        }
+    }
+    return VALID_MOVE;
+}
+
+// Helper private function for getting board position index
+static inline int get_board_index(board_t* board, int x, int y) {
+    return y * board->width + x;
+}
+
+// Helper private function for checking valid position
+static inline int is_valid_position(board_t* board, int x, int y) {
+    return (x >= 0 && x < board->width) && (y >= 0 && y < board->height); // Inside of the board boundaries
+}
+
+void sleep_ms(int milliseconds) {
+    struct timespec ts;
+    ts.tv_sec = milliseconds / 1000;
+    ts.tv_nsec = (milliseconds % 1000) * 1000000;
+    nanosleep(&ts, NULL);
+}
+
+
 void locksOrder(int new_index, int old_index, board_t* board){
     if(new_index > old_index){
         pthread_rwlock_wrlock(&board->board[new_index].lock); //lock posição de destino
@@ -29,43 +69,6 @@ void unlockOrder(int new_index, int old_index, board_t* board){
         pthread_rwlock_unlock(&board->board[new_index].lock);
         pthread_rwlock_unlock(&board->board[old_index].lock);
     }
-}
-// Helper private function to find and kill pacman at specific position
-static int find_and_kill_pacman(board_t* board, int new_x, int new_y) {
-    for (int p = 0; p < board->n_pacmans; p++) {
-        pacman_t* pac = &board->pacmans[p];
-        pthread_rwlock_rdlock(&pac->lock);
-        int px = pac->pos_x;
-        int py = pac->pos_y;
-        int alive = pac->alive;
-        pthread_rwlock_unlock(&pac->lock);
-        if (px == new_x && py == new_y && alive) {
-            pthread_rwlock_wrlock(&pac->lock);
-            pac->alive = 0;
-            pthread_rwlock_unlock(&pac->lock);
-            kill_pacman(board, p);
-            return DEAD_PACMAN;
-        }
-        //pthread_rwlock_unlock(&pac->lock);
-    }
-    return VALID_MOVE;
-}
-
-// Helper private function for getting board position index
-static inline int get_board_index(board_t* board, int x, int y) {
-    return y * board->width + x;
-}
-
-// Helper private function for checking valid position
-static inline int is_valid_position(board_t* board, int x, int y) {
-    return (x >= 0 && x < board->width) && (y >= 0 && y < board->height); // Inside of the board boundaries
-}
-
-void sleep_ms(int milliseconds) {
-    struct timespec ts;
-    ts.tv_sec = milliseconds / 1000;
-    ts.tv_nsec = (milliseconds % 1000) * 1000000;
-    nanosleep(&ts, NULL);
 }
 
 int move_pacman(board_t* board, int pacman_index, command_t* command) {
@@ -172,7 +175,9 @@ int move_pacman(board_t* board, int pacman_index, command_t* command) {
 
     // Collect points
     if (board->board[new_index].has_dot) {
+        pthread_rwlock_wrlock(&pac->lock);
         pac->points++;
+        pthread_rwlock_unlock(&pac->lock);
         board->board[new_index].has_dot = 0;
     }
 
@@ -416,17 +421,12 @@ int move_ghost(board_t* board, int ghost_index, command_t* command) {
 
 
 void kill_pacman(board_t* board, int pacman_index) {
-    debug("Killing %d pacman\n\n", pacman_index);
+    //Every time we call this function we already have the lock for the board position
     pacman_t* pac = &board->pacmans[pacman_index];
-    //pthread_rwlock_wrlock(&pac->lock);
     int index = pac->pos_y * board->width + pac->pos_x;
 
-    //sempre que chamamos esta função já temos o lock para esta posição
-
     board->board[index].content = 'o';
-    //pthread_mutex_unlock(&board->ncurses_lock);
     
-    // Mark pacman as dead
     pthread_rwlock_wrlock(&pac->lock);
     pac->alive = 0;
     pthread_rwlock_unlock(&pac->lock);
@@ -490,7 +490,7 @@ void freeLevel(board_t *level){
     if (level->ghosts != NULL) free(level->ghosts);
     if (level->tid != NULL) free(level->tid);
     pthread_mutex_destroy(&level->ncurses_lock); // destruir o ncurses lock
-    pthread_mutex_destroy(&level->state_lock); // destruir o state lock
+    pthread_rwlock_destroy(&level->board_lock); // destruir o board lock
     free(level);
 }
 
