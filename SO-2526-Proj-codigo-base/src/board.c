@@ -450,9 +450,9 @@ int findFirstFreeSpot(board_t* board){
 
 
 //Loading pacman points
-void load_pacman(board_t* board, int points) {
+void load_pacman(board_t* board) {
     board->board[get_board_index(board,board->pacmans[0].pos_x, board->pacmans[0].pos_y)].content = 'P'; // Pacman
-    board->pacmans[0].points = points;
+    board->pacmans[0].points = board->accumulated_points;
 }
 
 int load_ghost(board_t* board, ghost_t* ghost){
@@ -462,10 +462,11 @@ int load_ghost(board_t* board, ghost_t* ghost){
     return 0;
 }
 
-int load_level(board_t *board, int points, int* hasBackup) {
+int load_level(board_t *board, int* hasBackup, int accPoints) {
     board->active = 1;
     board->hasBackup = hasBackup;
-    load_pacman(board, points);
+    board->accumulated_points = accPoints;
+    load_pacman(board);
     for(int i = 0; i < board->n_ghosts; i++){
         load_ghost(board, &board->ghosts[i]);
     }
