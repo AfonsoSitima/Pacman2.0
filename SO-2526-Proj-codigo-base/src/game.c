@@ -23,7 +23,7 @@
 
 
 void screen_refresh(board_t * game_board, int mode) {
-    debug("REFRESH\n");
+    //debug("REFRESH\n");
     draw_board(game_board, mode);
     refresh_screen();
     if(game_board->tempo != 0)
@@ -119,7 +119,7 @@ int createBackup(board_t* board) {
                 /*start_pacman_thread(board);
                 start_ghost_threads(board);
                 start_ncurses_thread(board);*/
-                board->hasBackup = 0;
+                *board->hasBackup = 0;
             }
         }
     }
@@ -507,127 +507,6 @@ void* ghost_thread(void* thread_data) {
     return NULL;
 }
 
-/*int main(int argc, char** argv) {
-    if (argc != 2) {
-        printf("Usage: %s <level_directory>\n", argv[0]);
-        // TODO receive inputs
-    }
-    // Random seed for any random movements
-    srand((unsigned int)time(NULL));
-
-    open_debug_file("debug.log");
-
-    terminal_init();
-    
-    int indexLevel = 0;
-    board_t *game_board = NULL;
-    int accumulated_points = 0;
-    bool end_game = false;
-    bool hasBackUp = false;
-
-    
-    board_t** levels = handle_files(argv[1]);
-    
-    
-    while (!end_game) {
-
-        if (levels[indexLevel] == NULL) {
-            end_game = true;
-            break; 
-        }
-        game_board = levels[indexLevel];
-        
-        load_level(game_board, accumulated_points); //NO NOVO MÉTODO TEM DE ACUMULAR PONTOS
-
-        pthread_t ncurses_tid;
-        thread_ncurses ncurses_data;
-
-        ncurses_data.board = game_board;
-        ncurses_data.running = 1;
-        pthread_create(&ncurses_tid, NULL, ncurses_thread, &ncurses_data);
-
-        //tart_ncurses_thread(game_board);
-
-        //draw_board(game_board, DRAW_MENU);
-
-        //refresh_screen();
-
-        //tart_ncurses_thread(game_board);
-
-        //draw_board(game_board, DRAW_MENU);
-
-        //refresh_screen();
-
-        //tart_ncurses_thread(game_board);
-
-        //draw_board(game_board, DRAW_MENU);
-
-        //refresh_screen();
-        if(strcmp(game_board->pacman_file, "")){
-            start_pacman_thread(game_board);
-        }
-        start_ghost_threads(game_board); //talvez começar isto no load_level????
-        while(true) {
-            
-            int result = play_board(game_board, hasBackUp); 
-            if(result == NEXT_LEVEL) {
-                pthread_mutex_lock(&game_board->state_lock);
-                game_board->active = 0; 
-                ncurses_data.running = 0;
-                pthread_mutex_unlock(&game_board->state_lock);
-                pthread_join(ncurses_tid, NULL);
-                screen_refresh(game_board, DRAW_WIN);
-                sleep_ms(game_board->tempo); 
-                indexLevel++;
-                break;
-            }
-
-            if(result == LOAD_BACKUP) { 
-                pthread_mutex_lock(&game_board->state_lock);
-                game_board->active = 0;
-                pthread_mutex_unlock(&game_board->state_lock);
-                game_board->active = 0;
-                unload_allLevels(levels, indexLevel);
-                terminal_cleanup();
-                exit(1);  //o filho morre
-            }
-
-            if(result == CREATE_BACKUP){
-                result = (createBackup(&hasBackUp) == 1) ? QUIT_GAME : CONTINUE_PLAY;
-            }
-
-
-            if(result == QUIT_GAME) {
-                pthread_mutex_lock(&game_board->state_lock);
-                game_board->active = 0; 
-                ncurses_data.running = 0;
-                pthread_mutex_unlock(&game_board->state_lock);
-                pthread_join(ncurses_tid, NULL);
-                screen_refresh(game_board, DRAW_GAME_OVER); 
-                sleep_ms(game_board->tempo);
-                end_game = true;
-                break;
-            }
-    
-            //screen_refresh(game_board, DRAW_MENU); 
-
-            accumulated_points = game_board->pacmans[0].points;      
-        }
-        stop_ghost_threads(game_board);
-        if(strcmp(game_board->pacman_file, "")){
-            stop_pacman_thread(game_board);
-        }
-        print_board(game_board);
-        unload_level(game_board);
-        
-    }
-    unload_allLevels(levels, indexLevel);
-    terminal_cleanup();
-
-    close_debug_file();
-
-    return 0;
-}*/
 
 void start_ncurses_thread(board_t* board) {
     thread_ncurses* thread_data = malloc(sizeof(thread_ncurses));
@@ -719,7 +598,7 @@ int main(int argc, char** argv) {
                 screen_refresh(game_board, DRAW_WIN);
                 sleep_ms(game_board->tempo); 
                 indexLevel++;
-                unload_level(game_board);
+                //unload_level(game_board);
                 break;
             
             case LOAD_BACKUP:
@@ -734,10 +613,6 @@ int main(int argc, char** argv) {
                 pthread_join(game_board->ncursesTid, NULL);
                 stop_ghost_threads(game_board);
                 end_game = (createBackup(game_board) == 1) ? QUIT_GAME : CONTINUE_PLAY;
-                if(end_game) {
-                    screen_refresh(game_board, DRAW_GAME_OVER); 
-                    sleep_ms(game_board->tempo);
-                }
                 break;
             //JÀ TA FEiTO
             case QUIT_GAME:
