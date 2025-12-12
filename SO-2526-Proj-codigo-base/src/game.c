@@ -80,12 +80,11 @@ int play_board(board_t * game_board) {
     int result = move_pacman(game_board, 0, play);
     debug("%d\n", result);
     if (result == REACHED_PORTAL) {
-        // Next level
         return NEXT_LEVEL;
     }
 
     if(result == DEAD_PACMAN) {
-        if (*game_board->hasBackup) return LOAD_BACKUP;  //só funciona se o hasBackUp for aqui idk y
+        if (*game_board->hasBackup) return LOAD_BACKUP;
         return QUIT_GAME;
     }
             
@@ -96,11 +95,10 @@ int play_board(board_t * game_board) {
         pthread_rwlock_unlock(&pacman->lock);
         if (*game_board->hasBackup) return LOAD_BACKUP;
         return QUIT_GAME;
-    }      //NAO SEI SE ISTO É PRECISO AQUI
+    }
     pthread_rwlock_unlock(&pacman->lock);
     return CONTINUE_PLAY;  
 }
-
 
 int createBackup(board_t* board) {
     pid_t pid;
@@ -116,8 +114,8 @@ int createBackup(board_t* board) {
     }
     else{
         wait(&status);
-        if (WIFEXITED(status)) {                 // saiu normalmente
-            int code = WEXITSTATUS(status);      // código do exit
+        if (WIFEXITED(status)) {
+            int code = WEXITSTATUS(status);
             if (code == 0) {
                 return END_GAME;
             } 
@@ -129,23 +127,19 @@ int createBackup(board_t* board) {
     return CONTINUE_PLAY;
 }
 
-
-char* readFile(int fd, ssize_t* byte_count) { //talvez adicionar o numero de bytes lidos
+char* readFile(int fd, ssize_t* byte_count) {
     char* buffer = NULL;
     if(fd == -1){
         perror("openfile LevelFile");
-        //se o programa acabar aqui o que tem de se ter em conta? close's?
-        //temos que criar função para dar free a tudo :(
     }
 
-    off_t size = lseek(fd, 0, SEEK_END); //get size of file
+    off_t size = lseek(fd, 0, SEEK_END);
     if (size == -1){
         fprintf(stderr, "lseek error\n");
-        return NULL;
-        
+        return NULL; 
     }
 
-    if (lseek(fd, 0, SEEK_SET) == -1) { //reset file offset to beginning
+    if (lseek(fd, 0, SEEK_SET) == -1) {
         fprintf(stderr, "lseek erro\n");
         return NULL;
     }
@@ -158,15 +152,15 @@ char* readFile(int fd, ssize_t* byte_count) { //talvez adicionar o numero de byt
     }
  
     ssize_t total = 0;
-    while (total < (ssize_t) size) {  //fazemos isto em loop porque é boa prática e garantir que lemos tudo
-        ssize_t bytesRead = read(fd, buffer, size - total);
+    while (total < (ssize_t) size) {
+        ssize_t bytesRead = read(fd, buffer + total, size - total);
         if (bytesRead == -1) {
             fprintf(stderr, "read file error\n");
             free(buffer);
             return NULL;
         }
         if (bytesRead == 0) {
-            break; // EOF
+            break;
         }
         total += bytesRead;
     }
@@ -176,10 +170,10 @@ char* readFile(int fd, ssize_t* byte_count) { //talvez adicionar o numero de byt
 }
 
 char** getBufferLines(char* buffer, ssize_t byte_count, int* line_count){
-    char** lines = malloc(sizeof(char*) * (byte_count + 1)); //alocar espaço para as linhas (suposição de tamanho máximo)
-    char* line = strtok(buffer, "\n"); //separar por linhas
+    char** lines = malloc(sizeof(char*) * (byte_count + 1));
+    char* line = strtok(buffer, "\n");
     while (line != NULL) {
-        lines[(*line_count)++] = line; //guardar cada linha no array
+        lines[(*line_count)++] = line;
         line = strtok(NULL, "\n");  
     }
     return lines;
@@ -193,7 +187,7 @@ ghost_t* parseMonster(char* filename, char* dirpath){
     int line_count = 0;
 
     char path[PATH_MAX];
-    snprintf(path, sizeof(path), "%s/%s", dirpath, filename); //construir o path completo
+    snprintf(path, sizeof(path), "%s/%s", dirpath, filename); //builds the full path
     int fd = open(path, O_RDONLY);
     if(fd == -1){
         fprintf(stderr, "openfile MonsterFile failed\n");
@@ -252,7 +246,7 @@ pacman_t* parsePacman(char* filename, char* dirpath){
     int line_count = 0;
 
     char path[PATH_MAX];
-    snprintf(path, sizeof(path), "%s/%s", dirpath, filename); //construir o path completo
+    snprintf(path, sizeof(path), "%s/%s", dirpath, filename); //builds the full path
 
     int fd = open(path, O_RDONLY);
     if(fd == -1){
@@ -262,7 +256,6 @@ pacman_t* parsePacman(char* filename, char* dirpath){
 
     buffer = readFile(fd, &byte_count);
     if(!buffer){
-        //caso readFile function falhe
         return NULL;
     }
 
@@ -301,20 +294,17 @@ pacman_t* parsePacman(char* filename, char* dirpath){
 
     free(lines);
     free(buffer);
-    close(fd); //close mosnter file
+    close(fd);
     return pacman;
 }
 
-
-
 board_t* parseLvl(char* filename, char* dirpath){ 
-    //novo nível
     char* buffer = NULL;
     char** lines = NULL;
     ssize_t byte_count = 0;
     int line_count = 0;
     int matrix_index = 0;
-    board_t *lvl = NULL;  //ver se há malloc error
+    board_t *lvl = NULL;
     
     int fd = open(filename, O_RDONLY);
     if(fd == -1){
@@ -337,7 +327,7 @@ board_t* parseLvl(char* filename, char* dirpath){
         close(fd);
         return NULL;
     }
-    strcpy(lvl->level_name ,filename);           //level name
+    strcpy(lvl->level_name ,filename);       
     lvl->n_pacmans = 0; 
     lvl->n_ghosts = 0;
     lvl->pacmans = NULL;
@@ -352,7 +342,7 @@ board_t* parseLvl(char* filename, char* dirpath){
     for (int i = 0; i < line_count; i++) {
         if (strncmp(lines[i], "DIM", 3) == 0) {
             sscanf(lines[i], "DIM %d %d", &lvl->width, &lvl->height);
-            lvl->board = malloc(lvl->width * lvl->height * sizeof(board_pos_t)); //alocar espaço para o board
+            lvl->board = malloc(lvl->width * lvl->height * sizeof(board_pos_t));
         }
         else if (strncmp(lines[i], "TEMPO", 5) == 0) 
             sscanf(lines[i], "TEMPO %d", &lvl->tempo);
@@ -379,9 +369,9 @@ board_t* parseLvl(char* filename, char* dirpath){
         else if (strncmp(lines[i], "MON", 3) == 0) {
             char ghost_files[256 * MAX_GHOSTS];
             char *ghost_file;
-            char *saveptr;                // estado da strtok_r
+            char *saveptr;             
 
-            strcpy(ghost_files, lines[i] + 4);   // ignorar o "MON "
+            strcpy(ghost_files, lines[i] + 4);   // ignores "MON "
 
             ghost_file = strtok_r(ghost_files, " ", &saveptr);
 
@@ -411,7 +401,7 @@ board_t* parseLvl(char* filename, char* dirpath){
         else {
             for(int j = 0; j < lvl->width; j++) {
                 pthread_rwlock_init(&lvl->board[matrix_index].lock, NULL);
-                lvl->board[matrix_index].content = (lines[i][j] == '@') ? 'o' : lines[i][j]; //tratar portal como casa normal
+                lvl->board[matrix_index].content = (lines[i][j] == '@') ? 'o' : lines[i][j];
                 lvl->board[matrix_index].has_dot = (lines[i][j] == 'o') ? true : false;
                 lvl->board[matrix_index].has_portal = (lines[i][j] == '@') ? true : false;
                 matrix_index++;
@@ -422,7 +412,7 @@ board_t* parseLvl(char* filename, char* dirpath){
     if(strcmp(lvl->pacman_file, "") == 0){
         userPacman(lvl);
     }
-    lvl->tid = malloc(lvl->n_ghosts * sizeof(pthread_t)); //alocar espaço para os tids das threads Ghosts
+    lvl->tid = malloc(lvl->n_ghosts * sizeof(pthread_t));
     pthread_mutex_init(&lvl->ncurses_lock, NULL);           
     pthread_rwlock_init(&lvl->board_lock, NULL);           
 
@@ -432,7 +422,6 @@ board_t* parseLvl(char* filename, char* dirpath){
     return lvl;
 }
 
-//inicializa pacman quando não há ficheiro .p
 void userPacman(board_t* board){
     board->n_pacmans = 1;
     board->pacmans = (pacman_t*)calloc(1, sizeof(pacman_t));
@@ -454,12 +443,10 @@ void userPacman(board_t* board){
     board->board[startIndex].content = 'P';
 }
 
-
-
 board_t** handle_files(char* dirpath){   
     DIR *dirStream;   
     struct dirent *dp;
-    board_t **levels = NULL; //array de ponteiros com todos os níveis que vão ser lidos
+    board_t **levels = NULL;
     int numLevels = 0;
 
     dirStream = opendir(dirpath);  
@@ -477,18 +464,16 @@ board_t** handle_files(char* dirpath){
         if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
             continue; 
 
-
-        // quando se ler o .lvl é que se vai procurar os .p e .m correspondentes;
         char *extension = strchr(dp->d_name, '.'); //file extension    
         if(strcmp(extension, ".lvl") == 0){        
             char path[PATH_MAX];
-            snprintf(path, sizeof(path), "%s/%s", dirpath, dp->d_name); //construir o path completo
+            snprintf(path, sizeof(path), "%s/%s", dirpath, dp->d_name);
           
             board_t **tempLevels = realloc(levels, (numLevels + 1) * sizeof(board_t*));  
             if(!tempLevels){
                 fprintf(stderr, "realloc new level failed\n");
                 closedir(dirStream);
-                unload_allLevels(levels); //liberta tudo antes de falhar
+                unload_allLevels(levels);
                 exit(EXIT_FAILURE);
             }
             levels = tempLevels; //realoc to original array;
@@ -500,13 +485,11 @@ board_t** handle_files(char* dirpath){
             else{
                 fprintf(stderr, "parseLvl failed\n");
                 closedir(dirStream);
-                unload_allLevels(levels); //liberta tudo antes de falhar
+                unload_allLevels(levels);
                 exit(EXIT_FAILURE);
             }
-            numLevels++; //novo nível
-            
+            numLevels++;
         }
-
     }
     
 
@@ -532,7 +515,27 @@ board_t** handle_files(char* dirpath){
     return levels;
 }
 
-void start_ghost_threads(board_t* board) {    //trata de todas a threads dos ghosts
+void* ghost_thread(void* thread_data) {
+    thread_ghost_t* data = (thread_ghost_t*)thread_data;
+    board_t* board = data->board;
+    int ghost_index = data->index; 
+    ghost_t* ghost = &board->ghosts[ghost_index];
+    int active = 1;
+    while(1) {
+        sleep_ms(board->tempo);
+        move_ghost(board, ghost_index, &ghost->moves[ghost->current_move % ghost->n_moves]);
+        pthread_rwlock_rdlock(&board->board_lock);
+        active = board->active;
+        pthread_rwlock_unlock(&board->board_lock);
+        if (!active) {
+            break;
+        }
+    }
+    free(data);
+    return NULL;
+}
+
+void start_ghost_threads(board_t* board) {
     for (int i = 0; i < board->n_ghosts; i++) {
         thread_ghost_t* thread_data = malloc(sizeof(thread_ghost_t));
         thread_data->index = i;
@@ -541,14 +544,11 @@ void start_ghost_threads(board_t* board) {    //trata de todas a threads dos gho
     }
 }
 
-
 void stop_ghost_threads(board_t* board) {
     for(int i = 0; i < board->n_ghosts; i++) {
         pthread_join(board->tid[i], NULL);
     }
-
 }
-
 
 void* ncurses_thread(void* arg) {
     thread_ncurses* data = (thread_ncurses *)arg;
@@ -567,28 +567,6 @@ void* ncurses_thread(void* arg) {
     free(data);
     return NULL;
 }
-
-
-void* ghost_thread(void* thread_data) {
-    thread_ghost_t* data = (thread_ghost_t*)thread_data;
-    board_t* board = data->board;
-    int ghost_index = data->index; 
-    ghost_t* ghost = &board->ghosts[ghost_index];
-    int active = 1;
-    while(1) { //Arranjar forma de ver se o pacman entrou no portal
-        sleep_ms(board->tempo);
-        move_ghost(board, ghost_index, &ghost->moves[ghost->current_move % ghost->n_moves]);
-        pthread_rwlock_rdlock(&board->board_lock);
-        active = board->active;
-        pthread_rwlock_unlock(&board->board_lock);
-        if (!active) {
-            break;
-        }
-    }
-    free(data);
-    return NULL;
-}
-
 
 void start_ncurses_thread(board_t* board) {
     thread_ncurses* thread_data = malloc(sizeof(thread_ncurses));
@@ -610,15 +588,11 @@ void* pacman_thread(void* arg) {
     }
 }
 
-
 void start_pacman_thread(board_t* board) {
-
     thread_pacman_t* thread_data = malloc(sizeof(thread_pacman_t));
     thread_data->board = board;
     pthread_create(&board->pacTid, NULL, pacman_thread, thread_data);
 }
-
-
 
 int main(int argc, char** argv) {
     if (argc != 2) {
@@ -634,15 +608,12 @@ int main(int argc, char** argv) {
     terminal_init();
     int result;
     int indexLevel = 0;
-    int tempPoints = 0; //acumular entre niveis
+    int tempPoints = 0; //acumulated points between levels
     board_t *game_board = NULL;
     bool end_game = false;
     int* hasBackUp = malloc(sizeof(int));
     *hasBackUp = 0;
 
-    
-    
-    
     while (!end_game) {
 
         if (levels[indexLevel] == NULL) {
@@ -655,17 +626,16 @@ int main(int argc, char** argv) {
         
         load_level(game_board, hasBackUp, tempPoints); 
 
-
         start_ncurses_thread(game_board);
         start_pacman_thread(game_board);
         start_ghost_threads(game_board);
 
-        pthread_join(game_board->pacTid, NULL); //esperar pela thread do pacman
+        pthread_join(game_board->pacTid, NULL); //waits for pacman thread to end
 
-        result = game_board->result;
+        result = game_board->result; //get result of the game
 
         pthread_rwlock_wrlock(&game_board->board_lock);
-        game_board->active = 0;
+        game_board->active = 0;   //stop other threads
         pthread_rwlock_unlock(&game_board->board_lock);
         
         pthread_join(game_board->ncursesTid, NULL);
@@ -680,7 +650,7 @@ int main(int argc, char** argv) {
                 break;
             
             case LOAD_BACKUP:
-                exit(1);  //o filho morre
+                exit(1);
                 break;
             case CREATE_BACKUP:
                 tempPoints = game_board->pacmans[0].points;

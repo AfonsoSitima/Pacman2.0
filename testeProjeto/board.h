@@ -125,5 +125,4 @@ void debug(const char * format, ...);
 /*Writes the board and its contents to the open debug file*/
 void print_board(board_t* board);
 
-void* ghost_thread(void* arg);
 #endif

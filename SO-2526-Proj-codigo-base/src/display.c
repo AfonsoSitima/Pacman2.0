@@ -44,11 +44,7 @@ int terminal_init() {
     return 0;
 }
 
-//mudei bue isto
 void draw_board(board_t* board, int mode) {
-    // Garante que só uma thread mexe no ncurses de cada vez
-    //pthread_mutex_lock(&board->ncurses_lock);
-
     // Limpar o ecrã antes de redesenhar
     clear();
 
@@ -70,27 +66,25 @@ void draw_board(board_t* board, int mode) {
     }
     //attroff(COLOR_PAIR(5));
 
-    // Primeira linha do tabuleiro (reservar espaço para a UI)
+    // First row of the board (reserve space for UI)
     int start_row = 3;
 
-    // Desenhar o tabuleiro
     for (int y = 0; y < board->height; y++) {
         for (int x = 0; x < board->width; x++) {
             int index = y * board->width + x;
 
-            // Ler o estado da casa com lock de LEITURA
+            // Read the cell content with read lock
             pthread_rwlock_rdlock(&board->board[index].lock);
             char ch        = board->board[index].content;
             int has_dot    = board->board[index].has_dot;
             int has_portal = board->board[index].has_portal;
             pthread_rwlock_unlock(&board->board[index].lock);
 
-            // Mover o cursor para a posição correspondente
+            // moves the cursor to the correct position
             move(start_row + y, x);
 
-            // Desenhar com a cor apropriada
             switch (ch) {
-                case 'X': // Parede
+                case 'X': // Walls
                     attron(COLOR_PAIR(3));
                     addch('#');
                     attroff(COLOR_PAIR(3));
@@ -102,13 +96,13 @@ void draw_board(board_t* board, int mode) {
                     attroff(COLOR_PAIR(1) | A_BOLD);
                     break;
 
-                case 'M': // Fantasma
+                case 'M': // Ghosts
                     attron(COLOR_PAIR(2) | A_BOLD);
                     addch('M');
                     attroff(COLOR_PAIR(2) | A_BOLD);
                     break;
 
-                case 'o': // Espaço vazio / ponto / portal
+                case 'o': // Points / dots / portals
                     if (has_portal) {
                         attron(COLOR_PAIR(6));
                         addch('@');
@@ -129,7 +123,6 @@ void draw_board(board_t* board, int mode) {
         }
     }
 
-    // Desenhar pontuação no fundo
     attron(COLOR_PAIR(5));
     pthread_rwlock_rdlock(&board->pacmans[0].lock);
     int points = board->pacmans[0].points;
@@ -137,8 +130,6 @@ void draw_board(board_t* board, int mode) {
 
     mvprintw(start_row + board->height + 1, 0, "Points: %d", points);
     attroff(COLOR_PAIR(5));
-
-    //pthread_mutex_unlock(&board->ncurses_lock);
 }
 
 void draw(char c, int colour_i, int pos_x, int pos_y) {

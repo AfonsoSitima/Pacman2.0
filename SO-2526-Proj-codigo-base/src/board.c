@@ -48,15 +48,14 @@ void sleep_ms(int milliseconds) {
     nanosleep(&ts, NULL);
 }
 
-
 void locksOrder(int new_index, int old_index, board_t* board){
     if(new_index > old_index){
-        pthread_rwlock_wrlock(&board->board[new_index].lock); //lock posição de destino
-        pthread_rwlock_wrlock(&board->board[old_index].lock); //lock posição atual
+        pthread_rwlock_wrlock(&board->board[new_index].lock);
+        pthread_rwlock_wrlock(&board->board[old_index].lock);
     }
     else{
-        pthread_rwlock_wrlock(&board->board[old_index].lock); //lock posição atual
-        pthread_rwlock_wrlock(&board->board[new_index].lock); //lock posição de destino
+        pthread_rwlock_wrlock(&board->board[old_index].lock);
+        pthread_rwlock_wrlock(&board->board[new_index].lock); 
     }
 }
 
@@ -79,7 +78,6 @@ int move_pacman(board_t* board, int pacman_index, command_t* command) {
 
     pacman_t* pac = &board->pacmans[pacman_index];
 
-    // Ler estado inicial do pacman
     pthread_rwlock_rdlock(&pac->lock);
     int alive = pac->alive;
     int new_x = pac->pos_x;
@@ -89,8 +87,6 @@ int move_pacman(board_t* board, int pacman_index, command_t* command) {
     if (!alive) {
         return DEAD_PACMAN;
     }
-    //pthread_rwlock_wrlock(&board->board[get_board_index(board, new_x, new_y)].lock);
-
     // check passo
     if (pac->waiting > 0) {
         pac->waiting -= 1;
@@ -126,15 +122,10 @@ int move_pacman(board_t* board, int pacman_index, command_t* command) {
                 command->turns_left = command->turns;
             }
             else command->turns_left -= 1;
-            //pthread_rwlock_unlock(&board->board[get_board_index(board, new_x, new_y)].lock);
             return VALID_MOVE;
         default:
-            //pthread_rwlock_unlock(&board->board[get_board_index(board, new_x, new_y)].lock);
             return INVALID_MOVE; // Invalid direction
     }
-
-    //pthread_rwlock_unlock(&board->board[get_board_index(board, new_x, new_y)].lock);
-
     // Logic for the WASD movement
     pac->current_move+=1;
 
@@ -306,7 +297,6 @@ int move_ghost_charged(board_t* board, int ghost_index, char direction) {
         return INVALID_MOVE;
     }
 
-
     // Get board indices
     int old_index = get_board_index(board, ghost->pos_x, ghost->pos_y);
     int new_index = get_board_index(board, new_x, new_y);
@@ -415,9 +405,6 @@ int move_ghost(board_t* board, int ghost_index, command_t* command) {
     return result;
 }
 
-
-
-
 void kill_pacman(board_t* board, int pacman_index) {
     //Every time we call this function we already have the lock for the board position
     pacman_t* pac = &board->pacmans[pacman_index];
@@ -430,7 +417,6 @@ void kill_pacman(board_t* board, int pacman_index) {
     pthread_rwlock_unlock(&pac->lock);
 }
 
-//aux 1ª casa livre
 int findFirstFreeSpot(board_t* board){
     int freeIndex = 0;
     for(int spot = 0; spot < (board->height * board->width) ; spot++){
@@ -443,8 +429,6 @@ int findFirstFreeSpot(board_t* board){
     return freeIndex;
 }
 
-
-
 void load_pacman(board_t* board) {
     board->board[get_board_index(board,board->pacmans[0].pos_x, board->pacmans[0].pos_y)].content = 'P'; // Pacman
     board->pacmans[0].points = board->accumulated_points;
@@ -453,7 +437,6 @@ void load_pacman(board_t* board) {
 void load_ghost(board_t* board, ghost_t* ghost){    
     board->board[get_board_index(board, ghost->pos_x, ghost->pos_y)].content = 'M';
 }
-
 
 void load_level(board_t *board, int* hasBackup, int accPoints) {
     board->active = 1;
@@ -464,9 +447,6 @@ void load_level(board_t *board, int* hasBackup, int accPoints) {
         load_ghost(board, &board->ghosts[i]);
     }
 }
-
-
-
 
 void freeLevel(board_t *level){
     if (level->board != NULL){
@@ -479,16 +459,14 @@ void freeLevel(board_t *level){
     if (level->pacmans != NULL) free(level->pacmans);
     if (level->ghosts != NULL) free(level->ghosts);
     if (level->tid != NULL) free(level->tid);
-    pthread_mutex_destroy(&level->ncurses_lock); // destruir o ncurses lock
-    pthread_rwlock_destroy(&level->board_lock); // destruir o board lock
+    pthread_mutex_destroy(&level->ncurses_lock);
+    pthread_rwlock_destroy(&level->board_lock);
     free(level);
 }
-
 
 void unload_level(board_t *level) {
     freeLevel(level);
 }
-
 
 void unload_allLevels(board_t **levels){
 

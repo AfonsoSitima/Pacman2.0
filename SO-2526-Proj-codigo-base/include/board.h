@@ -151,7 +151,6 @@ void locksOrder(int new_index, int old_index, board_t* board);
  * @param board pointer to current level
  */
 void unlockOrder(int new_index, int old_index, board_t* board);
-// DEBUG FILE
 
 /*Opens the debug file*/
 void open_debug_file(char *filename);
@@ -165,5 +164,4 @@ void debug(const char * format, ...);
 /*Writes the board and its contents to the open debug file*/
 void print_board(board_t* board);
 
-void* ghost_thread(void* arg);
 #endif
