@@ -506,7 +506,6 @@ void start_ghost_threads(board_t* board) {    //trata de todas a threads dos gho
         thread_ghost_t* thread_data = malloc(sizeof(thread_ghost_t));
         thread_data->index = i;
         thread_data->board = board;
-        thread_data->moves = board->ghosts[i].moves;
         pthread_create(&board->tid[i], NULL, (void*) ghost_thread, thread_data);
     }
 }
@@ -565,7 +564,6 @@ void* ghost_thread(void* thread_data) {
 void start_ncurses_thread(board_t* board) {
     thread_ncurses* thread_data = malloc(sizeof(thread_ncurses));
     thread_data->board = board;
-    thread_data->running = 1;
     pthread_create(&board->ncursesTid, NULL, (void*) ncurses_thread, thread_data);
 }
 
@@ -587,10 +585,7 @@ void* pacman_thread(void* arg) {
 void start_pacman_thread(board_t* board) {
 
     thread_pacman_t* thread_data = malloc(sizeof(thread_pacman_t));
-    thread_data->index = 0; 
     thread_data->board = board;
-    thread_data->moves = board->pacmans[0].moves;
-    thread_data->hasBackup = 0;
     pthread_create(&board->pacTid, NULL, pacman_thread, thread_data);
 }
 

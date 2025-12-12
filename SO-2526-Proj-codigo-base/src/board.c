@@ -319,9 +319,7 @@ int move_ghost_charged(board_t* board, int ghost_index, char direction) {
     ghost->pos_x = new_x;
     ghost->pos_y = new_y;
     // Update board - set new position
-    pthread_mutex_lock(&board->ncurses_lock);
     board->board[new_index].content = 'M';
-    pthread_mutex_unlock(&board->ncurses_lock);
     unlockOrder(new_index, old_index, board);
 
     return result;
