@@ -434,7 +434,6 @@ void kill_pacman(board_t* board, int pacman_index) {
 
 //aux 1ª casa livre
 int findFirstFreeSpot(board_t* board){
-    //ver caso n haja free spot ? 
     int freeIndex = 0;
     for(int spot = 0; spot < (board->height * board->width) ; spot++){
     
@@ -443,26 +442,22 @@ int findFirstFreeSpot(board_t* board){
             break;
         }
     }
-    //o programa corre aqui ainda
     return freeIndex;
 }
 
 
 
-//Loading pacman points
 void load_pacman(board_t* board) {
     board->board[get_board_index(board,board->pacmans[0].pos_x, board->pacmans[0].pos_y)].content = 'P'; // Pacman
     board->pacmans[0].points = board->accumulated_points;
 }
 
-int load_ghost(board_t* board, ghost_t* ghost){
-    
+void load_ghost(board_t* board, ghost_t* ghost){    
     board->board[get_board_index(board, ghost->pos_x, ghost->pos_y)].content = 'M';
-
-    return 0;
 }
 
-int load_level(board_t *board, int* hasBackup, int accPoints) {
+
+void load_level(board_t *board, int* hasBackup, int accPoints) {
     board->active = 1;
     board->hasBackup = hasBackup;
     board->accumulated_points = accPoints;
@@ -470,20 +465,17 @@ int load_level(board_t *board, int* hasBackup, int accPoints) {
     for(int i = 0; i < board->n_ghosts; i++){
         load_ghost(board, &board->ghosts[i]);
     }
-    return 0;
 }
 
 
 
-//free level
-//free level
+
 void freeLevel(board_t *level){
     if (level->board != NULL){
         for(int i = 0; i < level->width * level->height; i++){
             pthread_rwlock_destroy(&level->board[i].lock);
 
         }
-        //pthread_mutex_destroy(&level->ncurses_lock); // destruir o lock
         free(level->board); 
     }
     if (level->pacmans != NULL) free(level->pacmans);
@@ -493,6 +485,7 @@ void freeLevel(board_t *level){
     pthread_rwlock_destroy(&level->board_lock); // destruir o board lock
     free(level);
 }
+
 
 void unload_level(board_t *level) {
     freeLevel(level);

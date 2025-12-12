@@ -481,21 +481,6 @@ void stop_ghost_threads(board_t* board) {
 
 }
 
-/*void start_pacman_thread(board_t* board) {
-    
-    thread_pacman_t* thread_data = malloc(sizeof(thread_pacman_t));
-    thread_data->index = 0; 
-    thread_data->board = board;
-    thread_data->moves = board->pacmans[0].moves;
-    pthread_create(&board->pacTid, NULL, (void*) pacman_thread, thread_data);
-    
-}
-void stop_pacman_thread(board_t* board) {
-    pthread_join(board->pacTid, NULL);
-    
-}*/
-
-
 
 void* ncurses_thread(void* arg) {
     thread_ncurses* data = (thread_ncurses *)arg;

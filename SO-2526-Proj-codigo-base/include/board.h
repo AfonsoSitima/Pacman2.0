@@ -30,7 +30,7 @@ typedef struct {
     int current_move;
     int n_moves; // number of predefined moves, 0 if controlled by user, >0 if readed from level file
     int waiting;
-    pthread_rwlock_t lock;
+    pthread_rwlock_t lock; //lock for pacman
 } pacman_t;
 
 typedef struct {
@@ -47,7 +47,7 @@ typedef struct {
     char content;   // stuff like 'P' for pacman 'M' for monster/ghost and 'W' for wall
     int has_dot;    // whether there is a dot in this position or not
     int has_portal; // whether there is a portal in this position or not
-    pthread_rwlock_t lock;
+    pthread_rwlock_t lock; //lock for each board cell
 } board_pos_t;
 
 
@@ -64,16 +64,15 @@ typedef struct {
     char pacman_file[256];  // file with pacman movements
     char ghosts_files[MAX_GHOSTS][256]; // files with monster movements
     int tempo;              // Duration of each play
-    pthread_t* tid; //tids of ghost threads
-    pthread_mutex_t ncurses_lock;
-    pthread_rwlock_t board_lock; 
-    //int ncursesDraw; //o que é preciso dar draw
-    int active; //nivel não mudou
-    pthread_t pacTid; //tid of pacman thread
-    pthread_t ncursesTid; //tid of ncurses thread
-    int result; 
-    int* hasBackup;
-    int accumulated_points;
+    pthread_t* tid;         //Thread id of every ghost thread
+    pthread_mutex_t ncurses_lock; //lock for ncurses
+    pthread_rwlock_t board_lock;  //lock for board
+    int active;             //flag to check if level changed
+    pthread_t pacTid;       //Thread id of pacman thread
+    pthread_t ncursesTid;   //Thread id of ncurses thread
+    int result;             //Store flag that decides next game action    
+    int* hasBackup;         //Flag to save if there is a backup
+    int accumulated_points; //Game points 
 
 } board_t;
 
@@ -88,37 +87,70 @@ command - command to be processed*/
 int move_pacman(board_t* board, int pacman_index, command_t* command);
 int move_ghost(board_t* board, int ghost_index, command_t* command);
 
-void* ghost_thread(void* thread_data);
-void* pacman_thread(void* thread_data);
+
 /*Process the death of a Pacman*/
 void kill_pacman(board_t* board, int pacman_index);
 
+/**
+ * @brief aux to find the first free cell to place user pacman.
+ * @param board pointer to the current board.
+ */
 int findFirstFreeSpot(board_t* board);
 
-/*Adds a pacman to the board*/
+/**
+ * @brief loads pacman to the board.
+ * @param board pointer to the current level.
+ */
 void load_pacman(board_t* board);
 
-/*Adds a ghost(monster) to the board*/
-int load_ghost(board_t* board, ghost_t* ghost);
+/**
+ * @brief loads a monster to the board.
+ * @param board pointer to the current board.
+ * @param ghost ghost to be placed.
+ */
+void load_ghost(board_t* board, ghost_t* ghost);
 
-/*Loads a level into board*/
-int load_level(board_t* board, int* hasBackup, int accPoints);
+/**
+ * @brief load a level to be played.
+ * @param board pointer to level to be loaded. 
+ * @param hasBackup flag to control if there is a current game backup. 
+ * @param accPoints points from last level.
+ */
+void load_level(board_t* board, int* hasBackup, int accPoints);
 
-void freePac(pacman_t *pacman);
-
-void freeGhost(ghost_t *ghost);
-
-
-/*Frees all memory allocated for a level*/
+/**
+ * @brief Frees level resources.
+ * @param level Pointer to the level. 
+ */
 void freeLevel(board_t *level);
 
-/*Unloads levels loaded by load_level*/
+/**
+ * @brief Unloads a level from the game.
+ * @param level Pointer to the level to unload.
+ */
 void unload_level(board_t * board);
 
-/*DOCUMENTAR!!!!! */
+/**
+ * @brief Unloads all levels from the game.
+ * @param levels Array of pointers to levels to unload.
+ */
 void unload_allLevels(board_t **levels);
 
+/**
+ * @brief consistent order for locking cells based on index
+ * @param new_index index where entity is moving
+ * @param old_index index where entity was before moving
+ * @param board pointer to current level
+ */
+void locksOrder(int new_index, int old_index, board_t* board);
 
+/**
+ * @brief consistent order for unlocking cells based on index
+ * @param new_index index where entity is moving
+ * @param old_index index where entity was before moving
+ * @param board pointer to current level
+ */
+void unlockOrder(int new_index, int old_index, board_t* board);
 // DEBUG FILE
 
 /*Opens the debug file*/
