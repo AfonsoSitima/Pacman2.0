@@ -150,7 +150,7 @@ char* readFile(int fd, ssize_t* byte_count) { //talvez adicionar o numero de byt
         perror("lseek");
     }
     
-    buffer = malloc(size + 1);
+    buffer = calloc(size + 1, sizeof(char));
     if(!buffer){
         perror("malloc");
         //ver o que fechar
@@ -291,7 +291,7 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
     
     lines = getBufferLines(buffer, byte_count, &line_count);
    
-    lvl = (board_t*)malloc(sizeof(board_t));  //ver se há malloc error
+    lvl = (board_t*)calloc(1, sizeof(board_t));  //ver se há malloc error
     strcpy(lvl->level_name ,filename); //inicializar o nome do nível
     lvl->n_pacmans = 0; //não sei se pode haver mais que 1 pacman
     lvl->n_ghosts = 0;
