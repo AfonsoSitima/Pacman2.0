@@ -203,13 +203,20 @@ ghost_t* parseMonster(char* filename, char* dirpath){
 
     buffer = readFile(fd, &byte_count);
     if(!buffer){
-        //caso readFile function falhe
         return NULL;
     }
 
     lines = getBufferLines(buffer, byte_count, &line_count);
 
     monster = (ghost_t*)malloc(sizeof(ghost_t));
+    if(!monster){
+        fprintf(stderr, "Monster malloc failed\n");
+        free(lines);
+        free(buffer);
+        close(fd);
+        return NULL;
+    }
+
     monster->charged = false;
     monster->waiting = 0;
     monster->n_moves = 0;
@@ -262,6 +269,13 @@ pacman_t* parsePacman(char* filename, char* dirpath){
     lines = getBufferLines(buffer, byte_count, &line_count);
 
     pacman = (pacman_t*)malloc(sizeof(pacman_t));
+    if(!pacman){
+        fprintf(stderr, "Pacman malloc failed\n");
+        free(lines);
+        free(buffer);
+        close(fd);
+        return NULL;
+    }
     pacman->alive = true;
     pacman->points = 0;
     pacman->waiting = 0;
@@ -292,8 +306,8 @@ pacman_t* parsePacman(char* filename, char* dirpath){
 }
 
 
-//VER SE HÁ MALLOC ERRORS AQUI
-board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a fazer no handle_files
+
+board_t* parseLvl(char* filename, char* dirpath){ 
     //novo nível
     char* buffer = NULL;
     char** lines = NULL;
@@ -303,16 +317,19 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
     board_t *lvl = NULL;  //ver se há malloc error
     
     int fd = open(filename, O_RDONLY);
+    if(fd == -1){
+        fprintf(stderr, "openfile LevelFile failed\n");
+        return NULL;
+    }
     
     buffer = readFile(fd, &byte_count);
     if(!buffer){
-        //caso readFile function falhe
         return NULL;
     }
     
     lines = getBufferLines(buffer, byte_count, &line_count);
    
-    lvl = (board_t*)calloc(1, sizeof(board_t));  //ver se há malloc error
+    lvl = (board_t*)calloc(1, sizeof(board_t));  
     if(!lvl){
         fprintf(stderr, "Calloc new level failed\n");
         free(lines);
@@ -351,6 +368,11 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
             }
             else{
                 fprintf(stderr, "parsePacman failed\n");
+                freeLevel(lvl);
+                free(lines);
+                free(buffer);
+                close(fd);
+                return NULL;
             }
         }
         
@@ -367,14 +389,16 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
                 ghost_t* tempGhost = parseMonster(ghost_file, dirpath);
                 if(tempGhost){
                     lvl->ghosts = realloc(lvl->ghosts, (lvl->n_ghosts + 1) * sizeof(ghost_t));
-                    if(!lvl->ghosts){
-                        free(tempGhost);
-                        fprintf(stderr, "realloc ghosts");
-                    }else{
-                        lvl->ghosts[lvl->n_ghosts] = *tempGhost;
-                        free(tempGhost);
-                    }
-                }       
+                    lvl->ghosts[lvl->n_ghosts] = *tempGhost;
+                    free(tempGhost);
+                }else{
+                    fprintf(stderr, "parseMonster failed\n");
+                    freeLevel(lvl);
+                    free(lines);
+                    free(buffer);
+                    close(fd);
+                    return NULL;
+                } 
                 strcpy(lvl->ghosts_files[lvl->n_ghosts], ghost_file);
                 lvl->n_ghosts++;
 
@@ -399,8 +423,8 @@ board_t* parseLvl(char* filename, char* dirpath){ //pela forma que estamos a faz
         userPacman(lvl);
     }
     lvl->tid = malloc(lvl->n_ghosts * sizeof(pthread_t)); //alocar espaço para os tids das threads Ghosts
-    pthread_mutex_init(&lvl->ncurses_lock, NULL); //lock do ncurses
-    pthread_rwlock_init(&lvl->board_lock, NULL); //lock do board
+    pthread_mutex_init(&lvl->ncurses_lock, NULL);           
+    pthread_rwlock_init(&lvl->board_lock, NULL);           
 
     free(lines);
     free(buffer);
@@ -431,14 +455,14 @@ void userPacman(board_t* board){
 }
 
 
-//retornar lista de níveis
-board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil construir os paths
+
+board_t** handle_files(char* dirpath){   
     DIR *dirStream;   
     struct dirent *dp;
     board_t **levels = NULL; //array de ponteiros com todos os níveis que vão ser lidos
     int numLevels = 0;
 
-    dirStream = opendir(dirpath);  //abrir isto aqui dentro para ter mais controlo
+    dirStream = opendir(dirpath);  
     if (dirStream == NULL) {
         fprintf(stderr, "Opendir Failed\n");
         exit(EXIT_FAILURE);
@@ -456,13 +480,10 @@ board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil cons
 
         // quando se ler o .lvl é que se vai procurar os .p e .m correspondentes;
         char *extension = strchr(dp->d_name, '.'); //file extension    
-        if(strcmp(extension, ".lvl") == 0){
-            //função de parse para lvl -> que por sua vez vai dar chamar o parse dos monstros e pac;
-            //dar realloc à estrutura de níveis cada vez que se cria um novo
-            
+        if(strcmp(extension, ".lvl") == 0){        
             char path[PATH_MAX];
             snprintf(path, sizeof(path), "%s/%s", dirpath, dp->d_name); //construir o path completo
-            //não sei se podemos fazer isto ja que snprintf é do stdio.h
+          
             board_t **tempLevels = realloc(levels, (numLevels + 1) * sizeof(board_t*));  
             if(!tempLevels){
                 fprintf(stderr, "realloc new level failed\n");
@@ -471,7 +492,17 @@ board_t** handle_files(char* dirpath){   //alterei isto para ser mais facil cons
                 exit(EXIT_FAILURE);
             }
             levels = tempLevels; //realoc to original array;
-            levels[numLevels] = parseLvl(path, dirpath);
+            levels[numLevels] = NULL;
+            board_t* tempLevel = parseLvl(path, dirpath); 
+            if(tempLevel){
+                levels[numLevels] = tempLevel;
+            }
+            else{
+                fprintf(stderr, "parseLvl failed\n");
+                closedir(dirStream);
+                unload_allLevels(levels); //liberta tudo antes de falhar
+                exit(EXIT_FAILURE);
+            }
             numLevels++; //novo nível
             
         }
@@ -537,9 +568,7 @@ void* ncurses_thread(void* arg) {
     return NULL;
 }
 
-//É obrigatório ter esta função
-//ver onde por locks
-//thread a desbloquear a casa onde estava e a bloquear a casa para onde vai
+
 void* ghost_thread(void* thread_data) {
     thread_ghost_t* data = (thread_ghost_t*)thread_data;
     board_t* board = data->board;
@@ -600,6 +629,7 @@ int main(int argc, char** argv) {
     srand((unsigned int)time(NULL));
 
     open_debug_file("debug.log");
+    board_t** levels = handle_files(argv[1]);
 
     terminal_init();
     int result;
@@ -611,7 +641,6 @@ int main(int argc, char** argv) {
     *hasBackUp = 0;
 
     
-    board_t** levels = handle_files(argv[1]);
     
     
     while (!end_game) {
@@ -624,7 +653,7 @@ int main(int argc, char** argv) {
         game_board->hasBackup = hasBackUp;
 
         
-        load_level(game_board, hasBackUp, tempPoints); //NO NOVO MÉTODO TEM DE ACUMULAR PONTOS
+        load_level(game_board, hasBackUp, tempPoints); 
 
 
         start_ncurses_thread(game_board);
