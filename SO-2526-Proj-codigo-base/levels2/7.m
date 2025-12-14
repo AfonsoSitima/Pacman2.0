@@ -1,3 +1,0 @@
-PASSO 1
-POS 8 8
-R

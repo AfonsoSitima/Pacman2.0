@@ -1,7 +1,0 @@
-PASSO 1
-POS 6 3
-W
-A
-S
-D
-#T 5
