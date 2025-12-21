@@ -13,11 +13,12 @@ TARGET = Pacmanist
 DIR_TARGET = levels2
 
 # Objects variables
-OBJS = game.o display.o board.o
+OBJS = game.o display.o board.o parse.o
 
 # Dependencies
 display.o = display.h
 board.o = board.h
+parse.o = parse.h
 
 # Object files path
 vpath %.o $(OBJ_DIR)

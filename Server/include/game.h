@@ -58,11 +58,5 @@ void start_pacman_thread(board_t* board);
  */
 void* pacman_thread(void* arg);
 
-/**
- * @brief pacman initialization for user input mode
- * @param board pointer to current level
- */
-void userPacman(board_t* board);
-
 
 #endif
