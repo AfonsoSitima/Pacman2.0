@@ -67,7 +67,7 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
 
   // Message format: (char)OP_CODE=1 | (char[40]) req_pipe | (char[40]) notif_pipe
   char msg[1 + 40 + 40];
-  memset(msg, 0, sizeof(msg));
+  memset(msg, '\0', sizeof(msg));
   msg[0] = OP_CODE_CONNECT;
   strncpy(msg + 1, req_pipe_path, 40);
   strncpy(msg + 1 + 40, notif_pipe_path, 40);
@@ -117,8 +117,16 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
 }
 
 void pacman_play(char command) {
-
-  // TODO - implement me
+  char buf[2];
+  buf[0] = OP_CODE_PLAY;
+  buf[1] = command;
+  if(write_all(session.req_pipe, buf, 2) != 0) {
+    //error
+    //return -1
+  }
+  //return 0;
+  //no enunciado diz para retornar int
+  //o enunciado tá todo fodido em comparacao ao codigo base
 
 }
 
@@ -130,5 +138,35 @@ int pacman_disconnect() {
 }
 
 Board receive_board_update(void) {
-    // TODO - implement me
+  Board board;
+  int width, height, tempo, victory, game_over, accumulated_points;
+  
+  char buf[sizeof(int) * 6 + width * height];
+  memset(buf, '\0', sizeof(buf));
+  
+  if (read_all(session.notif_pipe, buf, sizeof(buf)) != 0) {
+    //error
+  }
+  
+  if (buf[0] != OP_CODE_BOARD) {
+    //error
+  }
+  memcpy(&width, buf + 1, sizeof(int));
+  memcpy(&height, buf + 1 + sizeof(int), sizeof(int));
+  memcpy(&tempo, buf + 1 + sizeof(int) * 2, sizeof(int));
+  memcpy(&victory, buf + 1 + sizeof(int) * 3, sizeof(int));
+  memcpy(&game_over, buf + 1 + sizeof(int) * 4, sizeof(int));
+  memcpy(&accumulated_points, buf + 1 + sizeof(int) * 5, sizeof(int));
+
+  char board_data[width * height];
+  memcpy(board_data, buf + 1 + sizeof(int) * 6, width * height);
+
+  board.width = width;
+  board.height = height;
+  board.tempo = tempo;
+  board.victory = victory;
+  board.game_over = game_over;
+  board.accumulated_points = accumulated_points;
+  strncpy(board.data, board_data, width * height);
+  return board;
 }
