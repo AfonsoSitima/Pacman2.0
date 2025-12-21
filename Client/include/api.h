@@ -3,6 +3,8 @@
 
 #define PIPE_NAME_MAX_LENGTH 256
 
+#include <unistd.h>
+
 typedef struct {
   int width;
   int height;
@@ -13,9 +15,9 @@ typedef struct {
   char* data;
 } Board;
 
-int read_all(int fd, void *buf, size_t len);
+int read_all(int fd, char *buf, size_t len);
 
-int write_all(int fd, const void *buf, size_t len);
+int write_all(int fd, char *buf, size_t len);
 
 int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char const *server_pipe_path);
 

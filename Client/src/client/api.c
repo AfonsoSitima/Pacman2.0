@@ -23,7 +23,7 @@ static struct Session session = {.id = -1};
 
 
 
-static int write_all(int fd, const void *buf, size_t len) {
+int write_all(int fd, char *buf, size_t len) {
   const char *p = (const char *)buf;
   size_t written = 0;
   while (written < len) {
@@ -37,14 +37,14 @@ static int write_all(int fd, const void *buf, size_t len) {
   return 0;
 }
 
-static int read_all(int fd, void *buf, size_t len) {
+int read_all(int fd, char *buf, size_t len) {
   char *p = (char *)buf;
   size_t got = 0;
   while (got < len) {
     ssize_t ret = read(fd, p + got, len - got);
     if (ret == 0) return -1;              // EOF before full message
     if (ret < 0) {
-      if (errno == EINTR) continue;
+      //if (errno == EINTR) continue;
       return -1;
     }
     got += (size_t)ret;
@@ -131,7 +131,10 @@ void pacman_play(char command) {
 }
 
 int pacman_disconnect() {
-  write_all(session.req_pipe, OP_CODE_DISCONNECT, 1);
+  char buf[1];
+  buf[0] = OP_CODE_DISCONNECT;
+  write_all(session.req_pipe, buf, 1);
+
   close(session.req_pipe);
   close(session.notif_pipe);
   return 0;
@@ -139,7 +142,8 @@ int pacman_disconnect() {
 
 Board receive_board_update(void) {
   Board board;
-  int width, height, tempo, victory, game_over, accumulated_points;
+  int width = 0, height = 0;
+  int tempo, victory, game_over, accumulated_points;
   
   char buf[sizeof(int) * 6 + width * height];
   memset(buf, '\0', sizeof(buf));
