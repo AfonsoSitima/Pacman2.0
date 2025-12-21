@@ -1,6 +1,8 @@
 #ifndef API_H
 #define API_H
 
+#define PIPE_NAME_MAX_LENGTH 256
+
 typedef struct {
   int width;
   int height;
@@ -10,6 +12,10 @@ typedef struct {
   int accumulated_points;
   char* data;
 } Board;
+
+int read_all(int fd, void *buf, size_t len);
+
+int write_all(int fd, const void *buf, size_t len);
 
 int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char const *server_pipe_path);
 
