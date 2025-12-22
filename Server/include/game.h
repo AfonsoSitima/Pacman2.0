@@ -1,10 +1,11 @@
 #ifndef GAME_H
 #define GAME_H
 
+#include "api2.h"
 #include "board.h"
 
 typedef struct {
-    int index;
+    int index;  
     board_t* board;
 } thread_ghost_t;
 
@@ -16,6 +17,10 @@ typedef struct {
     board_t* board;
 } thread_pacman_t;
 
+typedef struct{
+    board_t* board;
+    session_t* game_s;
+} thread_server_t;
 /**
  * @brief starts a thread for every ghost
  * @param board pointer to current level

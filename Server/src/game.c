@@ -1,8 +1,8 @@
 #include "board.h"
+#include "api2.h"
 #include "display.h"
 #include "game.h"
 #include "parse.h"
-#include "api2.h"
 #include "protocol2.h"
 #include <stdlib.h>
 #include <time.h>
@@ -24,6 +24,7 @@
 #define PACMAN 1
 #define GHOST 2
 
+pthread_t serverId;
 
 void screen_refresh(board_t * game_board, int mode) {
     pthread_mutex_lock(&game_board->ncurses_lock);
@@ -209,15 +210,55 @@ void start_pacman_thread(board_t* board) {
     pthread_create(&board->pacTid, NULL, pacman_thread, thread_data);
 }
 
+char* boardToChar(board_t* board){
+    char* boardChar = malloc((board->height * board->width) * sizeof(char));
+    for(int i = 0, k = 0; i < board->width * board->height; i++, k++){
+        boardChar[k] = board->board[i].content;
+    }
+    return boardChar;
+}
+
+
+void* server_thread(void* arg){
+    thread_server_t* data = arg;
+    board_t* board = data->board;
+    session_t* game_s = data->game_s;
+    //atualiza periodicamente
+    sleep(5);
+    //LOCK TABULEIRO
+    //read lock tabuleiro
+    //Função para meter tabuleiro em char
+    pthread_rwlock_rdlock(&board->board_lock);
+    char* boardChar = boardToChar(board);
+    write_all(game_s->notif_pipe, boardChar, board->width * board->height);
+    pthread_rwlock_unlock(&board->board_lock);
+    debug("%s\n", boardChar);
+    return NULL;
+}
+
+void start_server_thread(board_t* board, session_t* game_s){
+    thread_server_t* thread_data = malloc(sizeof(thread_server_t));
+    thread_data->board = board;
+    thread_data->game_s = game_s;
+    pthread_create(&serverId, NULL, server_thread, thread_data);
+}
+
 int main(int argc, char** argv) {
-    if (argc != 2) {
-        printf("Usage: %s <level_directory>\n", argv[0]);
+    if (argc != 3 && argc != 4) {
+        fprintf(stderr,
+            "Usage: %s <levels_dir> <max_games> <register_pipe>\n",
+            argv[0]);
         exit(EXIT_FAILURE);
     }
     // Random seed for any random movements
     srand((unsigned int)time(NULL));
-
     open_debug_file("debug.log");
+
+        //ETAPA 1.1
+    //assumir sempre max_games = 1
+    int numS = 0;
+    session_t* game_s = innit_session(argv[3], &numS, 1);
+    
     board_t** levels = handle_files(argv[1]);
 
     terminal_init();
@@ -243,6 +284,7 @@ int main(int argc, char** argv) {
         
         load_level(game_board, hasBackUp, tempPoints); 
 
+        start_server_thread(game_board, game_s);
         start_ncurses_thread(game_board);
         start_pacman_thread(game_board);
         start_ghost_threads(game_board);

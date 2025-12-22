@@ -19,8 +19,7 @@ int read_all(int fd, char *buf, size_t len);
 
 int write_all(int fd, char *buf, size_t len);
 
-session_t* innit_session(char const *req_pipe_path, char const *notif_pipe_path, char const *server_pipe_path);
-
+session_t* innit_session(char const *server_pipe_path, int* nSessions, int max_games);
 
 
 

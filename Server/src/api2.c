@@ -58,7 +58,7 @@ session_t* innit_session(char const *server_pipe_path, int* nSessions, int max_g
     strncpy(session->req_pipe_path, buffer + 1, 40);
     strncpy(session->notif_pipe_path, buffer + 1 + 40, 40);
 
-    session->notif_pipe = open(session->notif_pipe, O_WRONLY);
+    session->notif_pipe = open(session->notif_pipe_path, O_WRONLY);
     if (session->notif_pipe < 0) {
         free(session);
         return NULL;
