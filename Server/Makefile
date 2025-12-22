@@ -19,6 +19,8 @@ OBJS = game.o display.o board.o parse.o
 display.o = display.h
 board.o = board.h
 parse.o = parse.h
+api2.o = api2.h
+protocol2.o = protocol2.h
 
 # Object files path
 vpath %.o $(OBJ_DIR)

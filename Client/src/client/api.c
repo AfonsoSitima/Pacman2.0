@@ -58,7 +58,7 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
   if (unlink(notif_pipe_path) != 0 && errno != ENOENT) return 1;
 
   // Create client FIFOs
-  if (mkfifo(req_pipe_path, 0640) != 0) return 1;
+  if (mkfifo(req_pipe_path, 0640) != 0) return 1;    //Não sei o que meter no segundo argumento
   if (mkfifo(notif_pipe_path, 0640) != 0) return 1;
 
   // Open server FIFO for writing and send CONNECT request

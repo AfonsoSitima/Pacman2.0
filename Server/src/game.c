@@ -2,6 +2,8 @@
 #include "display.h"
 #include "game.h"
 #include "parse.h"
+#include "api2.h"
+#include "protocol2.h"
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
@@ -226,6 +228,8 @@ int main(int argc, char** argv) {
     bool end_game = false;
     int* hasBackUp = malloc(sizeof(int));
     *hasBackUp = 0;
+
+
 
     while (!end_game) {
 
