@@ -35,7 +35,7 @@ void screen_refresh(board_t * game_board, int mode) {
     pthread_mutex_unlock(&game_board->ncurses_lock);   
 }
 
-int play_board(board_t * game_board) {
+int play_board(board_t * game_board, session_t* game_s) {
     pacman_t* pacman = &game_board->pacmans[0];
     command_t* play;
     command_t c;
@@ -49,7 +49,7 @@ int play_board(board_t * game_board) {
         return QUIT_GAME;
     }
 
-    if (pacman->n_moves == 0) { // if is user input
+    /*if (pacman->n_moves == 0) { // if is user input
         pthread_mutex_lock(&game_board->ncurses_lock);
         c.command = get_input();
         pthread_mutex_unlock(&game_board->ncurses_lock);
@@ -65,7 +65,12 @@ int play_board(board_t * game_board) {
         // avoid buffer overflow wrapping around with modulo of n_moves
         // this ensures that we always access a valid move for the pacman
         play = &pacman->moves[pacman->current_move%pacman->n_moves];
-    }
+    }*/
+
+    //não sei como é que funciona a cena de turns com a implementação com servers
+    play->command = get_pacman_command(game_s);
+    play->turns = 1;
+    play->turns_left = 0;
 
     debug("KEY %c\n", play->command);
 
@@ -193,9 +198,10 @@ void start_ncurses_thread(board_t* board) {
 void* pacman_thread(void* arg) {
     thread_pacman_t* data = arg;
     board_t* board = data->board;
+    session_t* game_s = data->game_s;
     while (1) {
         sleep_ms(board->tempo); 
-        int play = play_board(board);
+        int play = play_board(board, game_s);
         if (play == CONTINUE_PLAY)
             continue;
         board->result = play;
@@ -204,9 +210,10 @@ void* pacman_thread(void* arg) {
     }
 }
 
-void start_pacman_thread(board_t* board) {
+void start_pacman_thread(board_t* board, session_t* game_s) {
     thread_pacman_t* thread_data = malloc(sizeof(thread_pacman_t));
     thread_data->board = board;
+    thread_data->game_s = game_s;
     pthread_create(&board->pacTid, NULL, pacman_thread, thread_data);
 }
 
@@ -217,7 +224,6 @@ char* boardToChar(board_t* board){
     }
     return boardChar;
 }
-
 
 void* server_thread(void* arg){
     thread_server_t* data = arg;
@@ -286,7 +292,7 @@ int main(int argc, char** argv) {
 
         start_server_thread(game_board, game_s);
         start_ncurses_thread(game_board);
-        start_pacman_thread(game_board);
+        start_pacman_thread(game_board, game_s);
         start_ghost_threads(game_board);
 
         pthread_join(game_board->pacTid, NULL); //waits for pacman thread to end
@@ -327,6 +333,7 @@ int main(int argc, char** argv) {
     }
     unload_allLevels(levels);
     free(hasBackUp);
+    free_session(game_s);
     terminal_cleanup();
     close_debug_file();
 

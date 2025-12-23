@@ -15,12 +15,22 @@ typedef struct {
 
 typedef struct {
     board_t* board;
+    session_t* game_s;
 } thread_pacman_t;
 
 typedef struct{
     board_t* board;
     session_t* game_s;
 } thread_server_t;
+
+/**
+ * @brief main game loop
+ * @param game_board pointer to current level
+ * @param game_s pointer to current session
+ * @return result of the game
+ */
+int play_board(board_t * game_board, session_t* game_s);
+
 /**
  * @brief starts a thread for every ghost
  * @param board pointer to current level
@@ -55,7 +65,7 @@ void* ncurses_thread(void* arg);
  * @brief starts a thread dedicated to pacman
  * @param board pointer to current level
  */
-void start_pacman_thread(board_t* board);
+void start_pacman_thread(board_t* board, session_t* game_s);
 
 /**
  * @brief flux o pacman thread actions

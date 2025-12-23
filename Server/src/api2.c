@@ -10,6 +10,7 @@
 
 
 int write_all(int fd, char *buf, size_t len) {
+  //talvez tenhamos que por uma lock aqui se vários threads escreverem no mesmo pipe
   const char *p = (const char *)buf;
   size_t written = 0;
   while (written < len) {
@@ -73,6 +74,16 @@ session_t* innit_session(char const *server_pipe_path, int* nSessions, int max_g
     session->id = *nSessions;
     *nSessions += 1;
     return session;    //fechamos os pipes no final
+}
+
+char get_pacman_command(session_t* session) {
+    int reqfd = session->req_pipe;
+    if (reqfd < 0) return '\0';
+    char command[2];
+    if (read_all(reqfd, &command, sizeof(command)) != 0) {
+        return '\0';
+    }
+    return command[1];
 }
 
 void free_session(session_t* session) {
