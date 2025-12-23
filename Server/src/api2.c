@@ -80,7 +80,7 @@ char get_pacman_command(session_t* session) {
     int reqfd = session->req_pipe;
     if (reqfd < 0) return '\0';
     char command[2];
-    if (read_all(reqfd, &command, sizeof(command)) != 0) {
+    if (read_all(reqfd, command, sizeof(command)) != 0) {
         return '\0';
     }
     return command[1];

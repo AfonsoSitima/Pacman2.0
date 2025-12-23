@@ -37,8 +37,7 @@ void screen_refresh(board_t * game_board, int mode) {
 
 int play_board(board_t * game_board, session_t* game_s) {
     pacman_t* pacman = &game_board->pacmans[0];
-    command_t* play;
-    command_t c;
+    command_t* play = NULL;
 
     pthread_rwlock_rdlock(&pacman->lock);
     int alive = pacman->alive;
