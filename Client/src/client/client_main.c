@@ -21,11 +21,10 @@ static void *receiver_thread(void *arg) {
     (void)arg;
 
     while (true) {
-        
-        Board board = receive_board_update();
-        debug("%s\n", board.data);
+        board = receive_board_update();
 
         if (!board.data || board.game_over == 1){
+            debug("Game over received, stopping receiver thread...\n");
             pthread_mutex_lock(&mutex);
             stop_execution = true;
             pthread_mutex_unlock(&mutex);
@@ -41,6 +40,8 @@ static void *receiver_thread(void *arg) {
     }
 
     debug("Returning receiver thread...\n");
+    draw_board_client(board);
+    refresh_screen();
     return NULL;
 }
 
@@ -82,11 +83,12 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    pthread_t receiver_thread_id;
-    pthread_create(&receiver_thread_id, NULL, receiver_thread, NULL);
-    debug("AA");
     terminal_init();
     set_timeout(500);
+
+    pthread_t receiver_thread_id;
+    pthread_create(&receiver_thread_id, NULL, receiver_thread, NULL);
+
     draw_board_client(board);
     refresh_screen();
 
@@ -132,9 +134,9 @@ int main(int argc, char *argv[]) {
             command = toupper(command);
         }
 
-        if (command == '\0')
+        /*if (command == '\0')
             continue;
-
+        */
         if (command == 'Q') {
             debug("Client pressed 'Q', quitting game\n");
             break;
@@ -146,9 +148,12 @@ int main(int argc, char *argv[]) {
 
     }
 
+    pthread_join(receiver_thread_id, NULL);
+
     pacman_disconnect();
 
-    pthread_join(receiver_thread_id, NULL);
+    sleep_ms(1000);
+    debug("Exiting main...\n");
 
     if (cmd_fp)
         fclose(cmd_fp);

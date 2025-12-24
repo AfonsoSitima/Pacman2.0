@@ -136,6 +136,7 @@ int pacman_disconnect() {
 
   close(session.req_pipe);
   close(session.notif_pipe);
+  debug("Client exiting...\n");
   return 0;
 }
 
@@ -175,7 +176,7 @@ Board receive_board_update(void) {
   board.victory = victory;
   board.game_over = game_over;
   board.accumulated_points = accumulated_points;
-  debug("W : %d, H : %d, Tempo : %d, Vic: %d, Over: %d, Acc : %d\n", width, height, tempo, victory, game_over, accumulated_points);
-  debug("%s\n", board.data);
+  //debug("W : %d, H : %d, Tempo : %d, Vic: %d, Over: %d, Acc : %d\n", width, height, tempo, victory, game_over, accumulated_points);
+  //debug("%s\n", board.data);
   return board;
 }

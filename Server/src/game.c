@@ -37,7 +37,7 @@ void screen_refresh(board_t * game_board, int mode) {
 
 int play_board(board_t * game_board, session_t* game_s) {
     pacman_t* pacman = &game_board->pacmans[0];
-    command_t* play = NULL;
+    command_t* play = malloc(sizeof(command_t));
 
     pthread_rwlock_rdlock(&pacman->lock);
     int alive = pacman->alive;
@@ -69,8 +69,10 @@ int play_board(board_t * game_board, session_t* game_s) {
     //não sei como é que funciona a cena de turns com a implementação com servers
 
     play->command = get_pacman_command(game_s);
+    debug("Received command: %c\n", play->command);
     play->turns = 1;
     play->turns_left = 0;
+
 
     debug("KEY %c\n", play->command);
 
@@ -106,6 +108,7 @@ int play_board(board_t * game_board, session_t* game_s) {
         return QUIT_GAME;
     }
     pthread_rwlock_unlock(&pacman->lock);
+    free(play);
     return CONTINUE_PLAY;  
 }
 
@@ -244,23 +247,27 @@ void* server_thread(void* arg){
     thread_server_t* data = arg;
     board_t* board = data->board;
     session_t* game_s = data->game_s;
+    pacman_t* pacman = &board->pacmans[0];
+    int game_over;
+    int accumulated_points;
+    int aux = 0;
     //atualiza periodicamente
     while(1){
         sleep_ms(board->tempo);
         char buf[(sizeof(int) * 6) + 1];
         memset(buf, '\0', sizeof(buf));
         buf[0] = OP_CODE_BOARD;
-        int aux = 0;
-        
-        pthread_rwlock_rdlock(&board->board_lock);
-
+        pthread_rwlock_rdlock(&pacman->lock);
+        game_over = !pacman->alive;
+        accumulated_points = pacman->points;
+        pthread_rwlock_unlock(&pacman->lock);
 
         memcpy(buf + 1, &board->width, sizeof(int));
         memcpy(buf + 1 + sizeof(int), &board->height, sizeof(int));
         memcpy(buf + 1 + sizeof(int) * 2, &board->tempo, sizeof(int));
-        memcpy(buf + 1 + sizeof(int) * 3, &board->active,  sizeof(int));
-        memcpy(buf + 1 + sizeof(int) * 4, &aux, sizeof(int));
-        memcpy(buf + 1 + sizeof(int) * 5, &board->accumulated_points, sizeof(int));
+        memcpy(buf + 1 + sizeof(int) * 3, &aux,  sizeof(int));
+        memcpy(buf + 1 + sizeof(int) * 4, &game_over, sizeof(int));
+        memcpy(buf + 1 + sizeof(int) * 5, &accumulated_points, sizeof(int));
 
         write_all(game_s->notif_pipe, buf, sizeof(buf));
         //LOCK TABULEIRO
@@ -268,11 +275,11 @@ void* server_thread(void* arg){
         //Função para meter tabuleiro em char
         char* boardChar = boardToChar(board);
 
-        debug("%s\n", buf);
+        //debug("%s\n", buf);
         
         write_all(game_s->notif_pipe, boardChar, board->height * board->width);
-        pthread_rwlock_unlock(&board->board_lock);
-        debug("%s\n", boardChar);
+        //pthread_rwlock_unlock(&board->board_lock);
+        //debug("%s\n", boardChar);
         free(boardChar);
 
         pthread_rwlock_rdlock(&board->board_lock);
