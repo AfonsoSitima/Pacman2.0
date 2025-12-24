@@ -67,6 +67,7 @@ int play_board(board_t * game_board, session_t* game_s) {
     }*/
 
     //não sei como é que funciona a cena de turns com a implementação com servers
+
     play->command = get_pacman_command(game_s);
     play->turns = 1;
     play->turns_left = 0;
@@ -229,15 +230,44 @@ void* server_thread(void* arg){
     board_t* board = data->board;
     session_t* game_s = data->game_s;
     //atualiza periodicamente
-    sleep(5);
-    //LOCK TABULEIRO
-    //read lock tabuleiro
-    //Função para meter tabuleiro em char
-    pthread_rwlock_rdlock(&board->board_lock);
-    char* boardChar = boardToChar(board);
-    write_all(game_s->notif_pipe, boardChar, board->width * board->height);
-    pthread_rwlock_unlock(&board->board_lock);
-    debug("%s\n", boardChar);
+    while(1){
+        sleep_ms(board->tempo);
+        char buf[(sizeof(int) * 6) + 1];
+        memset(buf, '\0', sizeof(buf));
+        buf[0] = OP_CODE_BOARD;
+        int aux = 0;
+        
+        pthread_rwlock_rdlock(&board->board_lock);
+
+
+        memcpy(buf + 1, &board->width, sizeof(int));
+        memcpy(buf + 1 + sizeof(int), &board->height, sizeof(int));
+        memcpy(buf + 1 + sizeof(int) * 2, &board->tempo, sizeof(int));
+        memcpy(buf + 1 + sizeof(int) * 3, &board->active,  sizeof(int));
+        memcpy(buf + 1 + sizeof(int) * 4, &aux, sizeof(int));
+        memcpy(buf + 1 + sizeof(int) * 5, &board->accumulated_points, sizeof(int));
+
+        write_all(game_s->notif_pipe, buf, sizeof(buf));
+        //LOCK TABULEIRO
+        //read lock tabuleiro
+        //Função para meter tabuleiro em char
+        char* boardChar = boardToChar(board);
+
+        debug("%s\n", buf);
+        
+        write_all(game_s->notif_pipe, boardChar, board->height * board->width);
+        pthread_rwlock_unlock(&board->board_lock);
+        debug("%s\n", boardChar);
+        free(boardChar);
+
+        pthread_rwlock_rdlock(&board->board_lock);
+        int active = board->active;
+        pthread_rwlock_unlock(&board->board_lock);
+        if (!active) {
+            break;
+        }
+    }
+    free(data);
     return NULL;
 }
 
@@ -264,9 +294,10 @@ int main(int argc, char** argv) {
     int numS = 0;
     session_t* game_s = innit_session(argv[3], &numS, 1);
     
+
     board_t** levels = handle_files(argv[1]);
 
-    terminal_init();
+    //terminal_init();
     int result;
     int indexLevel = 0;
     int tempPoints = 0; //acumulated points between levels
@@ -289,9 +320,9 @@ int main(int argc, char** argv) {
         
         load_level(game_board, hasBackUp, tempPoints); 
 
-        start_server_thread(game_board, game_s);
-        start_ncurses_thread(game_board);
+        //start_ncurses_thread(game_board);
         start_pacman_thread(game_board, game_s);
+        start_server_thread(game_board, game_s);
         start_ghost_threads(game_board);
 
         pthread_join(game_board->pacTid, NULL); //waits for pacman thread to end
@@ -302,13 +333,14 @@ int main(int argc, char** argv) {
         game_board->active = 0;   //stop other threads
         pthread_rwlock_unlock(&game_board->board_lock);
         
-        pthread_join(game_board->ncursesTid, NULL);
+        //pthread_join(game_board->ncursesTid, NULL);
+        pthread_join(serverId, NULL);
         stop_ghost_threads(game_board);
 
         switch (result) {
             case NEXT_LEVEL:
-                screen_refresh(game_board, DRAW_WIN);
-                sleep_ms(game_board->tempo); 
+                //screen_refresh(game_board, DRAW_WIN);
+                //sleep_ms(game_board->tempo); 
                 tempPoints = game_board->pacmans[0].points;
                 indexLevel++;
                 break;
@@ -321,8 +353,8 @@ int main(int argc, char** argv) {
                 end_game = (createBackup(game_board) == 1) ? true : false;
                 break;
             case QUIT_GAME:
-                screen_refresh(game_board, DRAW_GAME_OVER); 
-                sleep_ms(game_board->tempo);
+                //screen_refresh(game_board, DRAW_GAME_OVER); 
+                //sleep_ms(game_board->tempo);
                 end_game = true;
                 break;
             default:
@@ -333,7 +365,7 @@ int main(int argc, char** argv) {
     unload_allLevels(levels);
     free(hasBackUp);
     free_session(game_s);
-    terminal_cleanup();
+    //terminal_cleanup();
     close_debug_file();
 
     return 0;

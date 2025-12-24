@@ -89,17 +89,16 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
     session.notif_pipe = -1;
     return 1;
   }
-
   if (resp[0] != OP_CODE_CONNECT) {
     // Unexpected response
     close(session.notif_pipe);
     session.notif_pipe = -1;
     return 1;
   }
-
   // Only after confirmation, open request FIFO for writing
   session.req_pipe = open(req_pipe_path, O_WRONLY);
   if (session.req_pipe < 0) {
+    debug("Entrou\n");
     close(session.notif_pipe);
     session.notif_pipe = -1;
     return 1;
@@ -111,7 +110,7 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
   strncpy(session.notif_pipe_path, notif_pipe_path, MAX_PIPE_PATH_LENGTH);
   session.notif_pipe_path[MAX_PIPE_PATH_LENGTH] = '\0';
 
-
+  
   // Return 0 on success, 1 on error (server decides result)
   return (resp[1] == 0) ? 0 : 1;
 }
@@ -145,25 +144,30 @@ Board receive_board_update(void) {
   int width = 0, height = 0;
   int tempo, victory, game_over, accumulated_points;
   
-  char buf[sizeof(int) * 6 + width * height];
+  char buf[1 + (sizeof(int) * 6)];
   memset(buf, '\0', sizeof(buf));
+
+    //verificar se o opcode está certo
+
   
-  if (read_all(session.notif_pipe, buf, sizeof(buf)) != 0) {
+  if (read_all(session.notif_pipe, buf, 1+ (sizeof(int) * 6)) != 0) {
     //error
   }
-  
+    memcpy(&width, buf + 1, sizeof(int));
+    memcpy(&height, buf + sizeof(int) + 1,    sizeof(int));
+    memcpy(&tempo, 1 + (buf + sizeof(int) * 2), sizeof(int));
+    memcpy(&victory, 1 + (buf + sizeof(int) * 3), sizeof(int));
+    memcpy(&game_over, 1 + (buf + sizeof(int) * 4), sizeof(int));
+    memcpy(&accumulated_points, 1 + (buf + sizeof(int) * 5), sizeof(int));
   if (buf[0] != OP_CODE_BOARD) {
     //error
   }
-  memcpy(&width, buf + 1, sizeof(int));
-  memcpy(&height, buf + 1 + sizeof(int), sizeof(int));
-  memcpy(&tempo, buf + 1 + sizeof(int) * 2, sizeof(int));
-  memcpy(&victory, buf + 1 + sizeof(int) * 3, sizeof(int));
-  memcpy(&game_over, buf + 1 + sizeof(int) * 4, sizeof(int));
-  memcpy(&accumulated_points, buf + 1 + sizeof(int) * 5, sizeof(int));
 
-  char board_data[width * height];
-  memcpy(board_data, buf + 1 + sizeof(int) * 6, width * height);
+  board.data = malloc((width * height) * sizeof(char));
+
+  if (read_all(session.notif_pipe, board.data, height * width) != 0) {
+    //error
+  }
 
   board.width = width;
   board.height = height;
@@ -171,6 +175,7 @@ Board receive_board_update(void) {
   board.victory = victory;
   board.game_over = game_over;
   board.accumulated_points = accumulated_points;
-  strncpy(board.data, board_data, width * height);
+  debug("W : %d, H : %d, Tempo : %d, Vic: %d, Over: %d, Acc : %d\n", &width, &height, &tempo, &victory, &game_over, &accumulated_points);
+  debug("%s\n", board.data);
   return board;
 }

@@ -1,4 +1,5 @@
 #include "api2.h"
+#include "board.h"
 #include "protocol2.h"
 #include <fcntl.h>
 #include <unistd.h>
@@ -59,6 +60,9 @@ session_t* innit_session(char const *server_pipe_path, int* nSessions, int max_g
     strncpy(session->req_pipe_path, buffer + 1, 40);
     strncpy(session->notif_pipe_path, buffer + 1 + 40, 40);
 
+    debug("%s\n", session->req_pipe_path);
+    debug("%s\n", session->notif_pipe_path);
+
     session->notif_pipe = open(session->notif_pipe_path, O_WRONLY);
     if (session->notif_pipe < 0) {
         free(session);
@@ -71,6 +75,13 @@ session_t* innit_session(char const *server_pipe_path, int* nSessions, int max_g
         free(session);
         return NULL;
     }
+
+    session->req_pipe = open(session->req_pipe_path, O_RDONLY);
+    if (session->notif_pipe < 0){
+      free(session);
+      return NULL;
+    }
+
     session->id = *nSessions;
     *nSessions += 1;
     return session;    //fechamos os pipes no final
@@ -83,6 +94,7 @@ char get_pacman_command(session_t* session) {
     if (read_all(reqfd, command, sizeof(command)) != 0) {
         return '\0';
     }
+    debug("Comando recebido : %c\n", command[1]);
     return command[1];
 }
 

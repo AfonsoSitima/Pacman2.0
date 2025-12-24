@@ -23,6 +23,7 @@ static void *receiver_thread(void *arg) {
     while (true) {
         
         Board board = receive_board_update();
+        debug("%s\n", board.data);
 
         if (!board.data || board.game_over == 1){
             pthread_mutex_lock(&mutex);
@@ -74,7 +75,8 @@ int main(int argc, char *argv[]) {
              "/tmp/%s_notification", client_id);
 
     open_debug_file("client-debug.log");
-
+    debug("%s\n", req_pipe_path);
+    debug("%s\n", notif_pipe_path);
     if (pacman_connect(req_pipe_path, notif_pipe_path, register_pipe) != 0) {
         perror("Failed to connect to server");
         return 1;
@@ -82,7 +84,7 @@ int main(int argc, char *argv[]) {
 
     pthread_t receiver_thread_id;
     pthread_create(&receiver_thread_id, NULL, receiver_thread, NULL);
-
+    debug("AA");
     terminal_init();
     set_timeout(500);
     draw_board_client(board);
@@ -94,9 +96,10 @@ int main(int argc, char *argv[]) {
     while (1) {
 
         pthread_mutex_lock(&mutex);
-        if (stop_execution)
+        if (stop_execution){
             pthread_mutex_unlock(&mutex);
             break;
+        }
         pthread_mutex_unlock(&mutex);
 
         if (cmd_fp) {
