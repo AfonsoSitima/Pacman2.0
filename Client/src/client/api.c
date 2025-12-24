@@ -150,15 +150,15 @@ Board receive_board_update(void) {
     //verificar se o opcode está certo
 
   
-  if (read_all(session.notif_pipe, buf, 1+ (sizeof(int) * 6)) != 0) {
+  if (read_all(session.notif_pipe, buf, 1 + (sizeof(int) * 6)) != 0) {
     //error
   }
     memcpy(&width, buf + 1, sizeof(int));
-    memcpy(&height, buf + sizeof(int) + 1,    sizeof(int));
-    memcpy(&tempo, 1 + (buf + sizeof(int) * 2), sizeof(int));
-    memcpy(&victory, 1 + (buf + sizeof(int) * 3), sizeof(int));
-    memcpy(&game_over, 1 + (buf + sizeof(int) * 4), sizeof(int));
-    memcpy(&accumulated_points, 1 + (buf + sizeof(int) * 5), sizeof(int));
+    memcpy(&height, buf + 1 + sizeof(int),    sizeof(int));
+    memcpy(&tempo, buf + 1 + sizeof(int) * 2, sizeof(int));
+    memcpy(&victory, buf + 1 + sizeof(int) * 3, sizeof(int));
+    memcpy(&game_over, buf + 1 + sizeof(int) * 4, sizeof(int));
+    memcpy(&accumulated_points, buf + 1 + sizeof(int) * 5, sizeof(int));
   if (buf[0] != OP_CODE_BOARD) {
     //error
   }
@@ -175,7 +175,7 @@ Board receive_board_update(void) {
   board.victory = victory;
   board.game_over = game_over;
   board.accumulated_points = accumulated_points;
-  debug("W : %d, H : %d, Tempo : %d, Vic: %d, Over: %d, Acc : %d\n", &width, &height, &tempo, &victory, &game_over, &accumulated_points);
+  debug("W : %d, H : %d, Tempo : %d, Vic: %d, Over: %d, Acc : %d\n", width, height, tempo, victory, game_over, accumulated_points);
   debug("%s\n", board.data);
   return board;
 }
