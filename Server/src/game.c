@@ -220,7 +220,22 @@ void start_pacman_thread(board_t* board, session_t* game_s) {
 char* boardToChar(board_t* board){
     char* boardChar = malloc((board->height * board->width) * sizeof(char));
     for(int i = 0, k = 0; i < board->width * board->height; i++, k++){
-        boardChar[k] = board->board[i].content;
+        board_pos_t cell = board->board[i];
+        if(cell.content == 'o'){
+            if(cell.has_portal){
+                boardChar[k] = '@';
+            }
+            else if(cell.has_dot){
+                boardChar[k] = '.';
+            }
+            else {
+                boardChar[k] = ' ';
+            }
+        }
+        else{
+            boardChar[k] = cell.content;
+        }
+        
     }
     return boardChar;
 }

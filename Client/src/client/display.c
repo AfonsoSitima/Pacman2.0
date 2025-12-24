@@ -75,13 +75,13 @@ void draw_board_client(Board board) {
 
             // Draw with appropriate color
             switch (ch) {
-                case '#': // Wall
+                case 'X': // Wall
                     attron(COLOR_PAIR(3));
                     addch('#');
                     attroff(COLOR_PAIR(3));
                     break;
 
-                case 'C': // Pacman
+                case 'P': // Pacman
                     attron(COLOR_PAIR(1) | A_BOLD);
                     addch('C');
                     attroff(COLOR_PAIR(1) | A_BOLD);
@@ -99,7 +99,7 @@ void draw_board_client(Board board) {
                     attroff((COLOR_PAIR(2) | A_BOLD) | A_DIM);  
                     break;
 
-                case '.': // Dot
+                case 'o': // Dot
                     attron(COLOR_PAIR(4));
                     addch('.');
                     attroff(COLOR_PAIR(4));
