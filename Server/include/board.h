@@ -31,6 +31,7 @@ typedef struct {
     int n_moves; // number of predefined moves, 0 if controlled by user, >0 if readed from level file
     int waiting;
     pthread_rwlock_t lock; //lock for pacman
+    int won; //flag to check if pacman won
 } pacman_t;
 
 typedef struct {
@@ -73,6 +74,7 @@ typedef struct {
     int result;             //Store flag that decides next game action    
     int* hasBackup;         //Flag to save if there is a backup
     int accumulated_points; //Game points 
+    int can_win;          //Flag to check if level has a win condition
 
 } board_t;
 

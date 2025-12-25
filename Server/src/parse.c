@@ -220,6 +220,7 @@ board_t* parseLvl(char* filename, char* dirpath){
     lvl->active = 1;
     lvl->result = CONTINUE_PLAY;
     lvl->accumulated_points = 0;
+    lvl->can_win = 0;
 
     //read line by line
     for (int i = 0; i < line_count; i++) {

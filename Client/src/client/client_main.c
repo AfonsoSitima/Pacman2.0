@@ -23,7 +23,7 @@ static void *receiver_thread(void *arg) {
     while (true) {
         board = receive_board_update();
 
-        if (!board.data || board.game_over == 1){
+        if (!board.data || board.game_over == 1 || board.victory == 1) {
             debug("Game over received, stopping receiver thread...\n");
             pthread_mutex_lock(&mutex);
             stop_execution = true;
@@ -148,7 +148,11 @@ int main(int argc, char *argv[]) {
 
     }
 
+    debug("Waiting for receiver thread to finish...\n");
+
     pthread_join(receiver_thread_id, NULL);
+
+    debug("Disconnecting from server...\n");
 
     pacman_disconnect();
 

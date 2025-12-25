@@ -79,18 +79,26 @@ int play_board(board_t * game_board, session_t* game_s) {
     if (play->command == 'G'){
         if (pacman->n_moves != 0) pacman->current_move++;
         if(!*game_board->hasBackup){
+            free(play);
             return CREATE_BACKUP;
         }
         
     }
 
     if (play->command == 'Q') {
+        free(play);
         return QUIT_GAME;
     }
 
     int result = move_pacman(game_board, 0, play);
+    free(play);
     debug("%d\n", result);
     if (result == REACHED_PORTAL) {
+        if (game_board->can_win) {
+            pthread_rwlock_wrlock(&pacman->lock);
+            pacman->won = 1;
+            pthread_rwlock_unlock(&pacman->lock);
+        }
         return NEXT_LEVEL;
     }
 
@@ -108,7 +116,6 @@ int play_board(board_t * game_board, session_t* game_s) {
         return QUIT_GAME;
     }
     pthread_rwlock_unlock(&pacman->lock);
-    free(play);
     return CONTINUE_PLAY;  
 }
 
@@ -250,7 +257,7 @@ void* server_thread(void* arg){
     pacman_t* pacman = &board->pacmans[0];
     int game_over;
     int accumulated_points;
-    int aux = 0;
+    int victory;
     //atualiza periodicamente
     while(1){
         sleep_ms(board->tempo);
@@ -260,12 +267,13 @@ void* server_thread(void* arg){
         pthread_rwlock_rdlock(&pacman->lock);
         game_over = !pacman->alive;
         accumulated_points = pacman->points;
+        victory = pacman->won;
         pthread_rwlock_unlock(&pacman->lock);
 
         memcpy(buf + 1, &board->width, sizeof(int));
         memcpy(buf + 1 + sizeof(int), &board->height, sizeof(int));
         memcpy(buf + 1 + sizeof(int) * 2, &board->tempo, sizeof(int));
-        memcpy(buf + 1 + sizeof(int) * 3, &aux,  sizeof(int));
+        memcpy(buf + 1 + sizeof(int) * 3, &victory,  sizeof(int));
         memcpy(buf + 1 + sizeof(int) * 4, &game_over, sizeof(int));
         memcpy(buf + 1 + sizeof(int) * 5, &accumulated_points, sizeof(int));
 
@@ -332,13 +340,13 @@ int main(int argc, char** argv) {
 
     while (!end_game) {
 
-        if (levels[indexLevel] == NULL) {
-            end_game = true;
-            break; 
-        }
         game_board = levels[indexLevel];
         game_board->hasBackup = hasBackUp;
 
+        if (levels[indexLevel + 1] == NULL) {
+            end_game = true; //pode dar victory aqui
+            game_board->can_win = 1;
+        }
         
         load_level(game_board, hasBackUp, tempPoints); 
 
@@ -386,7 +394,7 @@ int main(int argc, char** argv) {
     }
     unload_allLevels(levels);
     free(hasBackUp);
-    free_session(game_s);
+    disconnect_session(game_s);
     //terminal_cleanup();
     close_debug_file();
 

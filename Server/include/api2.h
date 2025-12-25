@@ -23,7 +23,7 @@ session_t* innit_session(char const *server_pipe_path, int* nSessions, int max_g
 
 char get_pacman_command(session_t* session);
 
-void free_session(session_t* session);
+void disconnect_session(session_t* session);
 
 
 #endif
