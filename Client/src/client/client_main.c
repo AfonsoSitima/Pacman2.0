@@ -16,6 +16,8 @@ Board board;
 bool stop_execution = false;
 int tempo;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+bool board_ready = false;
 
 static void *receiver_thread(void *arg) {
     (void)arg;
@@ -33,12 +35,15 @@ static void *receiver_thread(void *arg) {
 
         pthread_mutex_lock(&mutex);
         tempo = board.tempo;
+        if (!board_ready && tempo > 0) {
+            board_ready = true;
+            pthread_cond_broadcast(&cond);  // acorda o main
+        }
         pthread_mutex_unlock(&mutex);
 
         draw_board_client(board);
         refresh_screen();
     }
-
     debug("Returning receiver thread...\n");
     draw_board_client(board);
     refresh_screen();
@@ -92,6 +97,10 @@ int main(int argc, char *argv[]) {
     draw_board_client(board);
     refresh_screen();
 
+    pthread_mutex_lock(&mutex);
+    while (!board_ready && !stop_execution) pthread_cond_wait(&cond, &mutex);
+    pthread_mutex_unlock(&mutex);
+
     char command;
     int ch;
 
@@ -127,6 +136,8 @@ int main(int argc, char *argv[]) {
             pthread_mutex_unlock(&mutex);
 
             sleep_ms(wait_for);
+            debug("wait_for : %d\n", tempo);
+            debug("wait_for2 : %d\n", wait_for);
             
         } else {
             // Interactive input

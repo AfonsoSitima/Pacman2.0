@@ -351,8 +351,9 @@ int main(int argc, char** argv) {
         load_level(game_board, hasBackUp, tempPoints); 
 
         //start_ncurses_thread(game_board);
-        start_pacman_thread(game_board, game_s);
         start_server_thread(game_board, game_s);
+        start_pacman_thread(game_board, game_s);
+        //start_server_thread(game_board, game_s);
         start_ghost_threads(game_board);
 
         pthread_join(game_board->pacTid, NULL); //waits for pacman thread to end
