@@ -5,6 +5,19 @@
 #include "board.h"
 
 typedef struct {
+    char req_pipe_path[40];
+    char notif_pipe_path[40];
+} client_request_t;
+
+typedef struct {
+    client_request_t* client_request;
+    int head; //proximo a sair
+    int tail; //proximo a entrar
+    int max_size;
+    pthread_mutex_t lock;
+} p2c_t;  //producer to consumer
+
+typedef struct {
     int index;  
     board_t* board;
 } thread_ghost_t;
@@ -22,6 +35,22 @@ typedef struct{
     board_t* board;
     session_t* game_s;
 } thread_server_t;
+
+typedef struct {
+    board_t** levels;
+    session_t* game_s;
+    sem_t* sem_games;
+    sem_t* sem_slots;
+    p2c_t* producerConsumer;
+    int id;
+} thread_game_t;
+
+typedef struct {
+    char* server_pipe_path;
+    p2c_t* producerConsumer;
+    sem_t* sem_games;
+    sem_t* sem_slots;
+} thread_host_t;
 
 /**
  * @brief main game loop

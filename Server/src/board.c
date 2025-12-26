@@ -540,3 +540,32 @@ void print_board(board_t *board) {
 
     debug("%s", buffer);
 }
+
+/*void deep_copy_levels(board_t** dest_levels, board_t** src_levels){
+    for(int i = 0; src_levels[i] != NULL; i++){
+        dest_levels[i] = malloc(sizeof(board_t));
+        memcpy(dest_levels[i], src_levels[i], sizeof(board_t));
+
+        // Deep copy board positions
+        dest_levels[i]->board = malloc(sizeof(board_pos_t) * src_levels[i]->width * src_levels[i]->height);
+        memcpy(dest_levels[i]->board, src_levels[i]->board, sizeof(board_pos_t) * src_levels[i]->width * src_levels[i]->height);
+
+        // Deep copy pacmans
+        dest_levels[i]->pacmans = malloc(sizeof(pacman_t) * src_levels[i]->n_pacmans);
+        memcpy(dest_levels[i]->pacmans, src_levels[i]->pacmans, sizeof(pacman_t) * src_levels[i]->n_pacmans);
+
+        // Deep copy ghosts
+        dest_levels[i]->ghosts = malloc(sizeof(ghost_t) * src_levels[i]->n_ghosts);
+        memcpy(dest_levels[i]->ghosts, src_levels[i]->ghosts, sizeof(ghost_t) * src_levels[i]->n_ghosts);
+
+        // Deep copy ghost files
+        dest_levels[i]->ghosts_files = malloc(sizeof(char*) * src_levels[i]->n_ghosts);
+        for(int j = 0; j < src_levels[i]->n_ghosts; j++){
+            dest_levels[i]->ghosts_files[j] = strdup(src_levels[i]->ghosts_files[j]);
+        }
+
+        // Initialize locks
+        pthread_rwlock_init(&dest_levels[i]->board_lock, NULL);
+        pthread_mutex_init(&dest_levels[i]->ncurses_lock, NULL);
+    }
+}*/

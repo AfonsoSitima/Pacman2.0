@@ -13,6 +13,7 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <pthread.h>
+#include <semaphore.h>
 
 #define CONTINUE_PLAY 0
 #define NEXT_LEVEL 1
@@ -24,7 +25,30 @@
 #define PACMAN 1
 #define GHOST 2
 
-pthread_t serverId;
+//pthread_t serverId;
+
+//maybe fazer esta parte noutro ficheiro
+void innit_p2c(p2c_t* p2c, int max_games) {
+    p2c->client_request = malloc(max_games * sizeof(client_request_t));
+    p2c->head = 0;
+    p2c->tail = 0;
+    p2c->max_size = max_games;
+}
+
+void destroy_p2c(p2c_t* p2c) {
+    free(p2c->client_request);
+}
+
+void enqueue_p2c(p2c_t* p2c, client_request_t* request) {
+    p2c->client_request[p2c->tail] = *request;
+    p2c->tail = (p2c->tail + 1) % p2c->max_size;
+}
+
+client_request_t pop_p2c(p2c_t* p2c) {
+    client_request_t request = p2c->client_request[p2c->head];
+    p2c->head = (p2c->head + 1) % p2c->max_size;
+    return request;
+}
 
 void screen_refresh(board_t * game_board, int mode) {
     pthread_mutex_lock(&game_board->ncurses_lock);
@@ -301,11 +325,230 @@ void* server_thread(void* arg){
     return NULL;
 }
 
-void start_server_thread(board_t* board, session_t* game_s){
+void start_server_thread(board_t* board, session_t* game_s, pthread_t* serverId) {
     thread_server_t* thread_data = malloc(sizeof(thread_server_t));
     thread_data->board = board;
     thread_data->game_s = game_s;
-    pthread_create(&serverId, NULL, server_thread, thread_data);
+    pthread_create(serverId, NULL, server_thread, thread_data);
+}
+
+void* game_thread(void* arg) {
+    thread_game_t* data = (thread_game_t*)arg;
+    //session_t* game_s = data->game_s;
+    p2c_t* producerConsumer = data->producerConsumer;
+    board_t** levels = data->levels;
+    sem_t* sem_games = data->sem_games;
+    sem_t* sem_slots = data->sem_slots;
+    int id = data->id;
+
+    char req_file_path[40];
+    char notif_file_path[40];
+    while(1){
+        sem_wait(sem_games); //espera por um novo jogo para iniciar
+
+        pthread_mutex_lock(&producerConsumer->lock);     //ler dados do produtor consumidor
+        client_request_t request = pop_p2c(producerConsumer);
+        strncpy(req_file_path, request.req_pipe_path, 40);
+        strncpy(notif_file_path, request.notif_pipe_path, 40);
+        pthread_mutex_unlock(&producerConsumer->lock);
+
+        sem_post(sem_slots); //há uma vaga para iniciar sessão
+
+        session_t *game_s = malloc(sizeof(session_t));
+        strncpy(game_s->req_pipe_path, req_file_path, 40);
+        strncpy(game_s->notif_pipe_path, notif_file_path, 40);
+        innit_session(game_s, id); //inicia sessão sem guardar o número de sessões
+
+        int indexLevel = 0;
+        int tempPoints = 0; //acumulated points between levels
+        board_t *game_board = NULL;
+        bool end_game = false;
+        int* hasBackUp = malloc(sizeof(int));
+        *hasBackUp = 0;
+        pthread_t serverId;
+        pthread_innit(&serverId, NULL);
+
+        while (!end_game) {
+
+            game_board = levels[indexLevel];
+            game_board->hasBackup = hasBackUp;
+
+            if (levels[indexLevel + 1] == NULL) {
+                end_game = true; //pode dar victory aqui
+                game_board->can_win = 1;
+            }
+            
+            load_level(game_board, hasBackUp, tempPoints); 
+
+            //start_ncurses_thread(game_board);
+            start_server_thread(game_board, game_s, &serverId);
+            start_pacman_thread(game_board, game_s);
+            //start_server_thread(game_board, game_s);
+            start_ghost_threads(game_board);
+
+            pthread_join(game_board->pacTid, NULL); //waits for pacman thread to end
+
+            int result = game_board->result; //get result of the game
+
+            pthread_rwlock_wrlock(&game_board->board_lock);
+            game_board->active = 0;   //stop other threads
+            pthread_rwlock_unlock(&game_board->board_lock);
+            
+            //pthread_join(game_board->ncursesTid, NULL);
+            pthread_join(serverId, NULL);
+            stop_ghost_threads(game_board);
+
+            switch (result) {
+                case NEXT_LEVEL:
+                    tempPoints = game_board->pacmans[0].points;
+                    indexLevel++;
+                    break;
+                
+                case LOAD_BACKUP:
+                    exit(1);
+                    break;
+                case CREATE_BACKUP:
+                    tempPoints = game_board->pacmans[0].points;
+                    end_game = (createBackup(game_board) == 1) ? true : false;
+                    break;
+                case QUIT_GAME:
+                    end_game = true;
+                    break;
+                default:
+                    break;
+            }
+        }
+        free(hasBackUp);
+        disconnect_session(game_s);
+    }
+    free(data);
+}
+
+
+/*void start_game_threads(char * server_pipe_path, int max_games, board_t** levels) {
+    int servfd;
+    int nSessions = 0;
+    int max = max_games;
+    if (unlink(server_pipe_path) != 0 && errno != ENOENT) return NULL;
+    if (mkfifo(server_pipe_path, 0640) != 0) return NULL; //cria o pipe do servidor
+
+    servfd = open(server_pipe_path, O_RDONLY);  //abre o pipe do servidor
+    if (servfd < 0) return NULL;
+
+    sem_t* sem = malloc(sizeof(sem_t));
+    sem_init(sem, 0, max_games); 
+
+    pthread_t* games = malloc(max_games * sizeof(pthread_t));
+
+    while(1) { //não sei quando acabar o loop
+        //sem_wait(&sem);
+        char buffer[1 + 40 + 40]; //1 para o id, 40 para o req pipe path, 40 para o notif pipe path 
+        read_all(servfd, buffer, sizeof(buffer)); //lê o que o cliente enviou
+        if(buffer[0] != OP_CODE_CONNECT) return; //error
+
+        sem_wait(&sem); //espera por uma vaga para iniciar sessão
+
+        session_t* session = malloc(sizeof(session_t));
+        strncpy(session->req_pipe_path, buffer + 1, 40);
+        strncpy(session->notif_pipe_path, buffer + 1 + 40, 40);
+
+        innit_session(session, &nSessions);
+
+        //comecar as threads
+        pthread_t gameId;
+        games[nSessions - 1] = gameId;
+        pthread_innit(&gameId, NULL);
+
+        thread_game_t* thread_data = malloc(sizeof(thread_game_t));
+        thread_data->game_s = session;
+        thread_data->levels = levels; //fazer deep copy se necessário
+        thread_data->sem = sem;
+
+        pthread_create(&gameId, NULL, game_thread, (void*)thread_data);
+        //sem_post(&sem);
+        if (nSessions == max - 1) {      //guarda espaço para mais jogos
+            games = realloc(games, (max + max_games) * sizeof(pthread_t));
+            max += max_games;
+        }
+    }
+    for(int i = 0; i < nSessions; i++) {
+        pthread_join(games[i], NULL);
+    }
+    close(servfd);
+    sem_destroy(sem);
+    unload_allLevels(levels);
+    return;
+}*/
+
+void start_game_threads(char * server_pipe_path, int max_games, board_t** levels, p2c_t* producerConsumer, sem_t* sem_games, sem_t* sem_slots) {
+    pthread_t* games = malloc(max_games * sizeof(pthread_t));
+    for (int i = 0; i < max_games; i++) {
+
+        /*pthread_t gameId;
+        games[i] = gameId;
+        pthread_innit(&gameId, NULL);
+        session_t* session = malloc(sizeof(session_t));
+        strncpy(session->req_pipe_path, producerConsumer + 1, 40);
+        strncpy(session->notif_pipe_path, producerConsumer + 1 + 40, 40);
+        innit_session(session, i); //inicia sessão sem guardar o número de sessões
+        */
+        pthread_t gameId;
+        games[i] = gameId;
+        thread_game_t* thread_data = malloc(sizeof(thread_game_t));
+        //thread_data->game_s = session;
+        thread_data->producerConsumer = producerConsumer;
+        thread_data->levels = levels; //fazer deep copy se necessário
+        thread_data->sem_games = sem_games;
+        thread_data->sem_slots = sem_slots;
+        thread_data->id = i;
+
+        pthread_create(&gameId, NULL, game_thread, (void*)thread_data);
+    }
+}
+
+void* host_thread(void* arg) {
+    thread_host_t* data = (thread_host_t*)arg;
+    p2c_t* producerConsumer = data->producerConsumer;
+    sem_t* sem_games = data->sem_games;
+    sem_t* sem_slots = data->sem_slots;
+    char* server_pipe_path = data->server_pipe_path;
+    char buf[1 + 40 + 40]; //1 para o id, 40 para o req pipe path, 40 para o notif pipe path
+
+    int servfd;
+
+    if (unlink(server_pipe_path) != 0 && errno != ENOENT) return NULL;
+    if (mkfifo(server_pipe_path, 0640) != 0) return NULL; //cria o pipe do servidor
+    servfd = open(server_pipe_path, O_RDWR);  //MUDEI PARA RDWR PARA NÃO BLOQUEAR
+    if (servfd < 0) return NULL;
+
+    while(1) {  
+        read_all(servfd, buf, sizeof(buf));
+       
+        client_request_t request;
+        if(buf[0] != OP_CODE_CONNECT) return; //error
+        strncpy(request.req_pipe_path, buf + 1, 40);
+        strncpy(request.notif_pipe_path, buf + 1 + 40, 40);
+
+        sem_wait(sem_slots); //espera por uma vaga para iniciar sessão
+        
+        pthread_mutex_lock(&producerConsumer->lock);     //escrever dados no produtor consumidor
+        enqueue_p2c(producerConsumer, &request);
+        pthread_mutex_unlock(&producerConsumer->lock);
+
+
+        sem_post(sem_games); //sinaliza que há um novo jogo para iniciar
+    }
+    free(data);
+}
+
+void start_host(p2c_t* p2c, sem_t* sem_games, sem_t* sem_slots, char* server_pipe_path) {
+    pthread_t hostId;
+    thread_host_t* data = malloc(sizeof(thread_host_t));
+    data->producerConsumer = p2c;
+    data->sem_games = sem_games;
+    data->sem_slots = sem_slots;
+    data->server_pipe_path = server_pipe_path;
+    pthread_create(&hostId, NULL, host_thread, (void*)data);
 }
 
 int main(int argc, char** argv) {
@@ -319,10 +562,43 @@ int main(int argc, char** argv) {
     srand((unsigned int)time(NULL));
     open_debug_file("debug.log");
 
+
+    sem_t* sem_games = malloc(sizeof(sem_t)); //ver se o jogo pode começar
+    sem_t* sem_slots = malloc(sizeof(sem_t)); //ver se há lugares disponiveis para iniciar sessão
+    board_t ** levels = handle_files(argv[1]);
+    p2c_t* p2c = malloc(sizeof(p2c_t));
+  
+    pthread_mutex_init(&p2c->lock, NULL);
+    innit_p2c(p2c, atoi(argv[2]));
+    sem_init(sem_games, 0, 0);
+    sem_init(sem_slots, 0, atoi(argv[2]));
+    start_host(p2c, sem_games, sem_slots, argv[3]);
+    start_game_threads(argv[3], atoi(argv[2]), levels, p2c, sem_games, sem_slots);
+
+    //OLAHHHAHHAHAHAHA
+    //Acho que temos que fazer deep copy ao levels :()
+
+    //a porra do server fica a correr para sempre
+    return 0;
+}
+
+
+
+/*int main(int argc, char** argv) {
+    if (argc != 3 && argc != 4) {
+        fprintf(stderr,
+            "Usage: %s <levels_dir> <max_games> <register_pipe>\n",
+            argv[0]);
+        exit(EXIT_FAILURE);
+    }
+    // Random seed for any random movements
+    srand((unsigned int)time(NULL));
+    open_debug_file("debug.log");
+
         //ETAPA 1.1
     //assumir sempre max_games = 1
     int numS = 0;
-    session_t* game_s = innit_session(argv[3], &numS, 1);
+    //session_t* game_s = innit_session(argv[3], &numS, 1);
     
 
     board_t** levels = handle_files(argv[1]);
@@ -401,3 +677,4 @@ int main(int argc, char** argv) {
 
     return 0;
 }
+*/
