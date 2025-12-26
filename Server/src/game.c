@@ -13,6 +13,8 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <pthread.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <semaphore.h>
 
 #define CONTINUE_PLAY 0
@@ -366,7 +368,7 @@ void* game_thread(void* arg) {
         int* hasBackUp = malloc(sizeof(int));
         *hasBackUp = 0;
         pthread_t serverId;
-        pthread_innit(&serverId, NULL);
+        //pthread_create(&serverId, NULL);
 
         while (!end_game) {
 
@@ -480,8 +482,15 @@ void* game_thread(void* arg) {
     return;
 }*/
 
-void start_game_threads(char * server_pipe_path, int max_games, board_t** levels, p2c_t* producerConsumer, sem_t* sem_games, sem_t* sem_slots) {
-    pthread_t* games = malloc(max_games * sizeof(pthread_t));
+board_t** levels(board_t** levels){
+
+
+
+    return levelsCopy;
+}
+
+void start_game_threads(/*char * server_pipe_path,*/ int max_games, pthread_t* gameTids, board_t** levels, p2c_t* producerConsumer, sem_t* sem_games, sem_t* sem_slots) {
+    //pthread_t* games = malloc(max_games * sizeof(pthread_t));
     for (int i = 0; i < max_games; i++) {
 
         /*pthread_t gameId;
@@ -492,17 +501,16 @@ void start_game_threads(char * server_pipe_path, int max_games, board_t** levels
         strncpy(session->notif_pipe_path, producerConsumer + 1 + 40, 40);
         innit_session(session, i); //inicia sessão sem guardar o número de sessões
         */
-        pthread_t gameId;
-        games[i] = gameId;
         thread_game_t* thread_data = malloc(sizeof(thread_game_t));
         //thread_data->game_s = session;
         thread_data->producerConsumer = producerConsumer;
-        thread_data->levels = levels; //fazer deep copy se necessário
+        //thread_data->levels = levels; //fazer deep copy se necessário
+        thread_data->levels = copyLevels(levels);
         thread_data->sem_games = sem_games;
         thread_data->sem_slots = sem_slots;
         thread_data->id = i;
 
-        pthread_create(&gameId, NULL, game_thread, (void*)thread_data);
+        pthread_create(&gameTids[i], NULL, game_thread, (void*)thread_data);
     }
 }
 
@@ -525,7 +533,7 @@ void* host_thread(void* arg) {
         read_all(servfd, buf, sizeof(buf));
        
         client_request_t request;
-        if(buf[0] != OP_CODE_CONNECT) return; //error
+        if(buf[0] != OP_CODE_CONNECT) return NULL; //error
         strncpy(request.req_pipe_path, buf + 1, 40);
         strncpy(request.notif_pipe_path, buf + 1 + 40, 40);
 
@@ -541,8 +549,9 @@ void* host_thread(void* arg) {
     free(data);
 }
 
+pthread_t hostId;
+
 void start_host(p2c_t* p2c, sem_t* sem_games, sem_t* sem_slots, char* server_pipe_path) {
-    pthread_t hostId;
     thread_host_t* data = malloc(sizeof(thread_host_t));
     data->producerConsumer = p2c;
     data->sem_games = sem_games;
@@ -573,10 +582,20 @@ int main(int argc, char** argv) {
     sem_init(sem_games, 0, 0);
     sem_init(sem_slots, 0, atoi(argv[2]));
     start_host(p2c, sem_games, sem_slots, argv[3]);
-    start_game_threads(argv[3], atoi(argv[2]), levels, p2c, sem_games, sem_slots);
+    int maxGames = atoi(argv[2]);
+    pthread_t* gameTids = malloc(sizeof(pthread_t) * maxGames);
+
+    start_game_threads(/*argv[3],*/ maxGames, gameTids, levels, p2c, sem_games, sem_slots);
 
     //OLAHHHAHHAHAHAHA
     //Acho que temos que fazer deep copy ao levels :()
+
+    pthread_join(hostId, NULL);
+    for(int i = 0 ; i < maxGames; i++){
+        pthread_join(gameTids[i], NULL);
+    }
+    free(gameTids);//organizar melhor isto
+    
 
     //a porra do server fica a correr para sempre
     return 0;

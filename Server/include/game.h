@@ -3,6 +3,7 @@
 
 #include "api2.h"
 #include "board.h"
+#include <semaphore.h>
 
 typedef struct {
     char req_pipe_path[40];
