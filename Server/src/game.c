@@ -482,15 +482,10 @@ void* game_thread(void* arg) {
     return;
 }*/
 
-board_t** levels(board_t** levels){
-
-
-
-    return levelsCopy;
-}
 
 void start_game_threads(/*char * server_pipe_path,*/ int max_games, pthread_t* gameTids, board_t** levels, p2c_t* producerConsumer, sem_t* sem_games, sem_t* sem_slots) {
     //pthread_t* games = malloc(max_games * sizeof(pthread_t));
+    int count_levels = get_levels_count(levels);
     for (int i = 0; i < max_games; i++) {
 
         /*pthread_t gameId;
@@ -505,7 +500,7 @@ void start_game_threads(/*char * server_pipe_path,*/ int max_games, pthread_t* g
         //thread_data->game_s = session;
         thread_data->producerConsumer = producerConsumer;
         //thread_data->levels = levels; //fazer deep copy se necessário
-        thread_data->levels = copyLevels(levels);
+        thread_data->levels = copy_levels(levels, count_levels);
         thread_data->sem_games = sem_games;
         thread_data->sem_slots = sem_slots;
         thread_data->id = i;

@@ -166,4 +166,8 @@ void debug(const char * format, ...);
 /*Writes the board and its contents to the open debug file*/
 void print_board(board_t* board);
 
+int get_levels_count(board_t** levels);
+
+board_t** copy_levels(board_t** levels, int count);
+
 #endif
