@@ -372,7 +372,7 @@ void* game_thread(void* arg) {
 
         while (!end_game) {
 
-            game_board = levels[indexLevel];
+            game_board = level_copy(levels[indexLevel]);
             game_board->hasBackup = hasBackUp;
 
             if (levels[indexLevel + 1] == NULL) {
@@ -420,6 +420,7 @@ void* game_thread(void* arg) {
                     break;
             }
         }
+        free(game_board); //free level copy
         free(hasBackUp);
         disconnect_session(game_s);
     }
@@ -485,7 +486,7 @@ void* game_thread(void* arg) {
 
 void start_game_threads(/*char * server_pipe_path,*/ int max_games, pthread_t* gameTids, board_t** levels, p2c_t* producerConsumer, sem_t* sem_games, sem_t* sem_slots) {
     //pthread_t* games = malloc(max_games * sizeof(pthread_t));
-    int count_levels = get_levels_count(levels);
+    //int count_levels = get_levels_count(levels);
     for (int i = 0; i < max_games; i++) {
 
         /*pthread_t gameId;
@@ -500,7 +501,7 @@ void start_game_threads(/*char * server_pipe_path,*/ int max_games, pthread_t* g
         //thread_data->game_s = session;
         thread_data->producerConsumer = producerConsumer;
         //thread_data->levels = levels; //fazer deep copy se necessário
-        thread_data->levels = copy_levels(levels, count_levels);
+        thread_data->levels = levels;
         thread_data->sem_games = sem_games;
         thread_data->sem_slots = sem_slots;
         thread_data->id = i;
@@ -525,10 +526,11 @@ void* host_thread(void* arg) {
     if (servfd < 0) return NULL;
 
     while(1) {  
-        read_all(servfd, buf, sizeof(buf));
+        if(read_all(servfd, buf, sizeof(buf)) < 0 ) continue;
        
+        if(buf[0] != OP_CODE_CONNECT) continue; //error
+
         client_request_t request;
-        if(buf[0] != OP_CODE_CONNECT) return NULL; //error
         strncpy(request.req_pipe_path, buf + 1, 40);
         strncpy(request.notif_pipe_path, buf + 1 + 40, 40);
 

@@ -541,15 +541,16 @@ void print_board(board_t *board) {
     debug("%s", buffer);
 }
 
-int get_levels_count(board_t** levels) {
+/* int get_levels_count(board_t** levels) {
     int count = 0;
     while (levels[count] != NULL) {
         count++;
     }
     return count;
 }
+*/
 
-board_t** copy_levels(board_t** src_levels, int num_levels) {
+ /* board_t** copy_levels(board_t** src_levels, int num_levels) {
     board_t** new = malloc(sizeof(board_t*) * (num_levels + 1));
     for(int i = 0; src_levels[i] != NULL; i++){
         new[i] = malloc(sizeof(board_t));
@@ -590,4 +591,45 @@ board_t** copy_levels(board_t** src_levels, int num_levels) {
         new[i]->hasBackup = NULL;
     }
     new[num_levels] = NULL; // Null-terminate the array
+    return new;
+} */
+
+board_t* level_copy(board_t* original){
+    board_t* newLevel = malloc(sizeof(board_t));
+        
+    memcpy(newLevel, original, sizeof(board_t));
+
+    // Deep copy board positions
+    newLevel->board = malloc(sizeof(board_pos_t) * original->width * original->height);
+    memcpy(newLevel->board, original->board, sizeof(board_pos_t) * original->width * original->height);
+
+    // Deep copy pacmans
+    newLevel->pacmans = malloc(sizeof(pacman_t) * original->n_pacmans);
+    memcpy(newLevel->pacmans, original->pacmans, sizeof(pacman_t) * original->n_pacmans);
+
+    // Deep copy ghosts
+    newLevel->ghosts = malloc(sizeof(ghost_t) * original->n_ghosts);
+    memcpy(newLevel->ghosts, original->ghosts, sizeof(ghost_t) * original->n_ghosts);
+
+    // Initialize locks
+    pthread_rwlock_init(&newLevel->board_lock, NULL);
+    pthread_mutex_init(&newLevel->ncurses_lock, NULL);
+
+    for (int k = 0; k < original->width * original->height; k++)
+        pthread_rwlock_init(&newLevel->board[k].lock, NULL);
+
+    // re-init lock do(s) pacman(s)
+    for (int p = 0; p < original->n_pacmans; p++)
+        pthread_rwlock_init(&newLevel->pacmans[p].lock, NULL);
+
+    // tid: deep copy (ou null)
+    original->tid = malloc(sizeof(pthread_t) * original->n_ghosts);
+
+    // threads antigas não fazem sentido
+    newLevel->pacTid = 0;
+    newLevel->ncursesTid = 0;
+
+    // pointer de backup idealmente por sessão
+    newLevel->hasBackup = NULL;
+    return newLevel;
 }
