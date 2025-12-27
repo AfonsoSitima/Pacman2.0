@@ -456,7 +456,10 @@ void freeLevel(board_t *level){
         }
         free(level->board); 
     }
-    if (level->pacmans != NULL) free(level->pacmans);
+    if (level->pacmans != NULL){
+        pthread_rwlock_destroy(&level->pacmans[0].lock);
+        free(level->pacmans);
+    }
     if (level->ghosts != NULL) free(level->ghosts);
     if (level->tid != NULL) free(level->tid);
     pthread_mutex_destroy(&level->ncurses_lock);

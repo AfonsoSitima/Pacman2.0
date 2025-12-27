@@ -69,8 +69,9 @@ int play_board(board_t * game_board, session_t* game_s) {
     int alive = pacman->alive;
     pthread_rwlock_unlock(&pacman->lock);
 
+    
     if (!alive) {
-        if (*game_board->hasBackup) return LOAD_BACKUP;
+        free(play);
         return QUIT_GAME;
     }
 
@@ -420,7 +421,7 @@ void* game_thread(void* arg) {
                     break;
             }
         }
-        free(game_board); //free level copy
+        unload_level(game_board); //free level copy
         free(hasBackUp);
         disconnect_session(game_s);
     }
