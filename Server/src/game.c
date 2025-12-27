@@ -16,6 +16,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <semaphore.h>
+#include <signal.h>
 
 #define CONTINUE_PLAY 0
 #define NEXT_LEVEL 1
@@ -405,23 +406,16 @@ void* game_thread(void* arg) {
                 case NEXT_LEVEL:
                     tempPoints = game_board->pacmans[0].points;
                     indexLevel++;
-                    break;
-                
-                case LOAD_BACKUP:
-                    exit(1);
-                    break;
-                case CREATE_BACKUP:
-                    tempPoints = game_board->pacmans[0].points;
-                    end_game = (createBackup(game_board) == 1) ? true : false;
+                    unload_level(game_board); //free level copy
                     break;
                 case QUIT_GAME:
                     end_game = true;
+                    unload_level(game_board); //free level copy
                     break;
                 default:
                     break;
             }
         }
-        unload_level(game_board); //free level copy
         free(hasBackUp);
         disconnect_session(game_s);
     }
@@ -565,6 +559,9 @@ int main(int argc, char** argv) {
             argv[0]);
         exit(EXIT_FAILURE);
     }
+
+    signal(SIGPIPE, SIG_IGN); //caso o cliente feche a ligação, não dá erro quando tentamos escrever para lá 
+
     // Random seed for any random movements
     srand((unsigned int)time(NULL));
     open_debug_file("debug.log");
@@ -575,26 +572,35 @@ int main(int argc, char** argv) {
     board_t ** levels = handle_files(argv[1]);
     p2c_t* p2c = malloc(sizeof(p2c_t));
   
-    pthread_mutex_init(&p2c->lock, NULL);
-    innit_p2c(p2c, atoi(argv[2]));
-    sem_init(sem_games, 0, 0);
-    sem_init(sem_slots, 0, atoi(argv[2]));
-    start_host(p2c, sem_games, sem_slots, argv[3]);
     int maxGames = atoi(argv[2]);
+
+    pthread_mutex_init(&p2c->lock, NULL);
+    innit_p2c(p2c, maxGames);
+    sem_init(sem_games, 0, 0);
+    sem_init(sem_slots, 0, maxGames);
+    start_host(p2c, sem_games, sem_slots, argv[3]);
     pthread_t* gameTids = malloc(sizeof(pthread_t) * maxGames);
 
     start_game_threads(/*argv[3],*/ maxGames, gameTids, levels, p2c, sem_games, sem_slots);
 
-    //OLAHHHAHHAHAHAHA
-    //Acho que temos que fazer deep copy ao levels :()
+    
 
     pthread_join(hostId, NULL);
     for(int i = 0 ; i < maxGames; i++){
         pthread_join(gameTids[i], NULL);
     }
     free(gameTids);//organizar melhor isto
-    
 
+    sem_destroy(sem_games);
+    free(sem_games);
+    sem_destroy(sem_slots);
+    free(sem_slots);
+    
+    pthread_mutex_destroy(&p2c->lock);
+    destroy_p2c(p2c); //liberta ponteiro "interior"
+    free(p2c);
+    
+    
     //a porra do server fica a correr para sempre
     return 0;
 }
