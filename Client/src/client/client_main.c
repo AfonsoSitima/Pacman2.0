@@ -43,10 +43,12 @@ static void *receiver_thread(void *arg) {
 
         draw_board_client(board);
         refresh_screen();
+        free(board.data);
     }
     debug("Returning receiver thread...\n");
     draw_board_client(board);
     refresh_screen();
+    free(board.data);
     return NULL;
 }
 
@@ -176,6 +178,7 @@ int main(int argc, char *argv[]) {
     pthread_mutex_destroy(&mutex);
 
     terminal_cleanup();
+    close_debug_file();
 
     return 0;
 }

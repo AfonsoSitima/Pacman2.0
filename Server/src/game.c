@@ -541,7 +541,11 @@ void* host_thread(void* arg) {
     free(data);
 }
 
+
+//-------------------RESOLVER-----------------------------------------------
+//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 pthread_t hostId;
+//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 
 void start_host(p2c_t* p2c, sem_t* sem_games, sem_t* sem_slots, char* server_pipe_path) {
     thread_host_t* data = malloc(sizeof(thread_host_t));
