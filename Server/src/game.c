@@ -492,7 +492,7 @@ void* game_thread(void* arg) {
 void start_game_threads(/*char * server_pipe_path,*/ int max_games, pthread_t* gameTids, board_t** levels, p2c_t* producerConsumer, sem_t* sem_games, sem_t* sem_slots, session_t** activeClients, pthread_mutex_t* clientsArrayLock) {
     //pthread_t* games = malloc(max_games * sizeof(pthread_t));
     //int count_levels = get_levels_count(levels);
-    for (int i = 0; i < max_games; i++) {
+    for (int i = 1; i <= max_games; i++) {
 
         /*pthread_t gameId;
         games[i] = gameId;
@@ -529,11 +529,11 @@ int maxPoints(const void* a, const void* b) {
 
 void leaderBoard(session_t** activeClients, int maxGames, pthread_mutex_t* lock){ // clients connected array
     //generate leaderboard
-    debug("GERANDO LEADERBOARD----");
+    debug("----GERANDO LEADERBOARD----");
     int count = 0;
     score temp[maxGames];
     pthread_mutex_lock(lock); //as threads do game podem estar a aceder
-    for(int id = 0; id < maxGames; id++){
+    for(int id = 1; id <= maxGames; id++){
         //computar
         if(!activeClients[id]) continue;
         temp[count].id = activeClients[id]->id;
@@ -549,7 +549,7 @@ void leaderBoard(session_t** activeClients, int maxGames, pthread_mutex_t* lock)
         //TRATAR ESTE ERRO MAIS TARDE
     }
 
-    for(int id = 0; id < 5; id ++){
+    for(int id = 1; id <= 5; id ++){
         char buf[25];
         int len = snprintf(buf, 25, "%d - %d\n", temp[id].id, temp[id].points);
         write(fd, buf, len);
@@ -645,6 +645,7 @@ int main(int argc, char** argv) {
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
     pthread_sigmask(SIG_BLOCK, &set, NULL);
+
     if (argc != 3 && argc != 4) {
         fprintf(stderr,
             "Usage: %s <levels_dir> <max_games> <register_pipe>\n",
@@ -658,7 +659,7 @@ int main(int argc, char** argv) {
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0; // Ajuda a que o read() não morra com erro
     sigaction(SIGUSR1, &sa, NULL); 
-    //signal(SIGUSR1, handle_SIGUSR1);
+    
     // Random seed for any random movements
     srand((unsigned int)time(NULL));
     open_debug_file("debug.log");
@@ -671,6 +672,7 @@ int main(int argc, char** argv) {
         
 
     int maxGames = atoi(argv[2]);
+    
     //lista de sessões abertas
     session_t** activeClients = calloc(maxGames, sizeof(session_t*));
 
