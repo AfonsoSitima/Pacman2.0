@@ -43,6 +43,8 @@ typedef struct {
     sem_t* sem_games;
     sem_t* sem_slots;
     p2c_t* producerConsumer;
+    session_t** activeClients; // lista dos clients;
+    pthread_mutex_t *clientsArrayLock;
     int id;
 } thread_game_t;
 
@@ -51,7 +53,16 @@ typedef struct {
     p2c_t* producerConsumer;
     sem_t* sem_games;
     sem_t* sem_slots;
+    session_t** activeClients; //clients ativos (para depois ver pontuações)
+    pthread_mutex_t *clientsArrayLock;
+    int maxGames;
 } thread_host_t;
+
+typedef struct {
+    int id;
+    int points;
+} score;
+
 
 /**
  * @brief main game loop

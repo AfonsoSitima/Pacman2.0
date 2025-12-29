@@ -13,6 +13,7 @@ typedef struct {
     int notif_pipe;
     char req_pipe_path[MAX_PIPE_PATH_LENGTH + 1];
     char notif_pipe_path[MAX_PIPE_PATH_LENGTH + 1];
+    int points;
 } session_t;
 
 int read_all(int fd, char *buf, size_t len);

@@ -43,7 +43,7 @@ static void *receiver_thread(void *arg) {
 
         draw_board_client(board);
         refresh_screen();
-        free(board.data);
+        free(board.data); //free tabuleiro
     }
     debug("Returning receiver thread...\n");
     draw_board_client(board);
