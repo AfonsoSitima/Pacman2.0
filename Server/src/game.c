@@ -549,7 +549,7 @@ void leaderBoard(session_t** activeClients, int maxGames, pthread_mutex_t* lock)
         //TRATAR ESTE ERRO MAIS TARDE
     }
 
-    for(int id = 0; id < count; id ++){
+    for(int id = 0; id < 5; id ++){
         char buf[25];
         int len = snprintf(buf, 25, "%d - %d\n", temp[id].id, temp[id].points);
         write(fd, buf, len);
@@ -557,12 +557,18 @@ void leaderBoard(session_t** activeClients, int maxGames, pthread_mutex_t* lock)
 
     if(close(fd) == -1){
         debug("[ERR]: LEADERBOARD FILE CLOSE SYSCALL FAILED");
+        //tratar mais tarde
     }
 
 
 }
 
 void* host_thread(void* arg) {
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGUSR1);
+    pthread_sigmask(SIG_UNBLOCK, &set, NULL);
+
     thread_host_t* data = (thread_host_t*)arg;
     p2c_t* producerConsumer = data->producerConsumer;
     sem_t* sem_games = data->sem_games;
@@ -635,6 +641,10 @@ void handle_SIGUSR1(){
     SIGUSR1_received = 1;
 }
 int main(int argc, char** argv) {
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGUSR1);
+    pthread_sigmask(SIG_BLOCK, &set, NULL);
     if (argc != 3 && argc != 4) {
         fprintf(stderr,
             "Usage: %s <levels_dir> <max_games> <register_pipe>\n",
