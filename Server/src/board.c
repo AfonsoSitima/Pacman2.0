@@ -438,9 +438,8 @@ void load_ghost(board_t* board, ghost_t* ghost){
     board->board[get_board_index(board, ghost->pos_x, ghost->pos_y)].content = 'M';
 }
 
-void load_level(board_t *board, int* hasBackup, int accPoints) {
+void load_level(board_t *board, int accPoints) {
     board->active = 1;
-    board->hasBackup = hasBackup;
     board->accumulated_points = accPoints;
     load_pacman(board);
     for(int i = 0; i < board->n_ghosts; i++){
@@ -633,6 +632,5 @@ board_t* level_copy(board_t* original){
     newLevel->ncursesTid = 0;
 
     // pointer de backup idealmente por sessão
-    newLevel->hasBackup = NULL;
     return newLevel;
 }

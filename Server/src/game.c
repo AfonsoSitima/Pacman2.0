@@ -23,7 +23,6 @@
 #define NEXT_LEVEL 1
 #define QUIT_GAME 2
 #define LOAD_BACKUP 3
-#define CREATE_BACKUP 4
 #define END_GAME 1
 #define PATH_MAX 512
 #define PACMAN 1
@@ -108,14 +107,7 @@ int play_board(board_t * game_board, session_t* game_s) {
 
     debug("KEY %c\n", play->command);
 
-    if (play->command == 'G'){
-        if (pacman->n_moves != 0) pacman->current_move++;
-        if(!*game_board->hasBackup){
-            free(play);
-            return CREATE_BACKUP;
-        }
-        
-    }
+
 
     if (play->command == 'Q') {
         free(play);
@@ -135,7 +127,6 @@ int play_board(board_t * game_board, session_t* game_s) {
     }
 
     if(result == DEAD_PACMAN) {
-        if (*game_board->hasBackup) return LOAD_BACKUP;
         return QUIT_GAME;
     }
             
@@ -144,38 +135,10 @@ int play_board(board_t * game_board, session_t* game_s) {
 
     if (!alive) {
         pthread_rwlock_unlock(&pacman->lock);
-        if (*game_board->hasBackup) return LOAD_BACKUP;
         return QUIT_GAME;
     }
     pthread_rwlock_unlock(&pacman->lock);
     return CONTINUE_PLAY;  
-}
-
-int createBackup(board_t* board) {
-    pid_t pid;
-    int status;
-
-    pid = fork();
-    if(pid == -1){
-        perror("Fork Error");
-    }
-    *board->hasBackup = 1;
-    if(pid == 0){
-        return CONTINUE_PLAY;
-    }
-    else{
-        wait(&status);
-        if (WIFEXITED(status)) {
-            int code = WEXITSTATUS(status);
-            if (code == 0) {
-                return END_GAME;
-            } 
-            else if (code == 1) {
-                *board->hasBackup = 0;
-            }
-        }
-    }
-    return CONTINUE_PLAY;
 }
 
 void* ghost_thread(void* thread_data) {
@@ -183,6 +146,9 @@ void* ghost_thread(void* thread_data) {
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
     pthread_sigmask(SIG_BLOCK, &set, NULL);    
+
+ 
+
     thread_ghost_t* data = (thread_ghost_t*)thread_data;
     board_t* board = data->board;
     int ghost_index = data->index; 
@@ -225,6 +191,7 @@ void* pacman_thread(void* arg) {
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
     pthread_sigmask(SIG_BLOCK, &set, NULL);
+
     thread_pacman_t* data = arg;
     board_t* board = data->board;
     session_t* game_s = data->game_s;
@@ -237,6 +204,10 @@ void* pacman_thread(void* arg) {
         free(data);
         return NULL;
     }
+    if(data){
+        free(data);
+    }
+    return NULL;
 }
 
 void start_pacman_thread(board_t* board, session_t* game_s) {
@@ -274,6 +245,9 @@ void* server_thread(void* arg){
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
     pthread_sigmask(SIG_BLOCK, &set, NULL);
+
+
+
     thread_server_t* data = arg;
     board_t* board = data->board;
     session_t* game_s = data->game_s;
@@ -337,6 +311,7 @@ void* game_thread(void* arg) {
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
     pthread_sigmask(SIG_BLOCK, &set, NULL);
+
     thread_game_t* data = (thread_game_t*)arg;
     //session_t* game_s = data->game_s;
     p2c_t* producerConsumer = data->producerConsumer;
@@ -345,7 +320,6 @@ void* game_thread(void* arg) {
     sem_t* sem_slots = data->sem_slots;
     session_t** activeClients = data->activeClients;
     pthread_mutex_t* lock = data->clientsArrayLock;
-    int id = data->id;
 
     char req_file_path[40];
     char notif_file_path[40];
@@ -363,33 +337,32 @@ void* game_thread(void* arg) {
         session_t *game_s = malloc(sizeof(session_t));
         strncpy(game_s->req_pipe_path, req_file_path, 40);
         strncpy(game_s->notif_pipe_path, notif_file_path, 40);
-        innit_session(game_s, id); //inicia sessão sem guardar o número de sessões
+        int id = request.id;
+        innit_session(game_s, request.id); //inicia sessão sem guardar o número de sessões
 
         //adicionar novo client
         pthread_mutex_lock(lock);
-        activeClients[id] = game_s;
+        activeClients[id - 1] = game_s;
         pthread_mutex_unlock(lock);
 
         int indexLevel = 0;
         int tempPoints = 0; //acumulated points between levels
         board_t *game_board = NULL;
         bool end_game = false;
-        int* hasBackUp = malloc(sizeof(int));
-        *hasBackUp = 0;
+
         pthread_t serverId;
         //pthread_create(&serverId, NULL);
 
         while (!end_game) {
 
             game_board = level_copy(levels[indexLevel]);
-            game_board->hasBackup = hasBackUp;
 
             if (levels[indexLevel + 1] == NULL) {
                 end_game = true; //pode dar victory aqui
                 game_board->can_win = 1;
             }
             
-            load_level(game_board, hasBackUp, tempPoints); 
+            load_level(game_board, tempPoints); 
 
             start_server_thread(game_board, game_s, &serverId);
             start_pacman_thread(game_board, game_s);
@@ -412,24 +385,24 @@ void* game_thread(void* arg) {
                 case NEXT_LEVEL:
                     tempPoints = game_board->pacmans[0].points;
                     indexLevel++;
-                    unload_level(game_board); //free level copy
+                    unload_level(game_board);
                     break;
                 case QUIT_GAME:
                     end_game = true;
-                    unload_level(game_board); //free level copy
+                    unload_level(game_board);
                     break;
                 default:
                     break;
             }
         }
-        free(hasBackUp);
         disconnect_session(game_s);
         pthread_mutex_lock(lock);
-        activeClients[id] = NULL; // remove client dos ativos
+        activeClients[id - 1] = NULL; // remove client dos ativos
         pthread_mutex_unlock(lock);
     }
     pthread_mutex_destroy(lock);
     free(data);
+    return NULL;
 }
 
 
@@ -492,7 +465,7 @@ void* game_thread(void* arg) {
 void start_game_threads(/*char * server_pipe_path,*/ int max_games, pthread_t* gameTids, board_t** levels, p2c_t* producerConsumer, sem_t* sem_games, sem_t* sem_slots, session_t** activeClients, pthread_mutex_t* clientsArrayLock) {
     //pthread_t* games = malloc(max_games * sizeof(pthread_t));
     //int count_levels = get_levels_count(levels);
-    for (int i = 1; i <= max_games; i++) {
+    for (int i = 0; i < max_games; i++) {
 
         /*pthread_t gameId;
         games[i] = gameId;
@@ -533,7 +506,7 @@ void leaderBoard(session_t** activeClients, int maxGames, pthread_mutex_t* lock)
     int count = 0;
     score temp[maxGames];
     pthread_mutex_lock(lock); //as threads do game podem estar a aceder
-    for(int id = 1; id <= maxGames; id++){
+    for(int id = 0; id < maxGames; id++){
         //computar
         if(!activeClients[id]) continue;
         temp[count].id = activeClients[id]->id;
@@ -549,7 +522,7 @@ void leaderBoard(session_t** activeClients, int maxGames, pthread_mutex_t* lock)
         //TRATAR ESTE ERRO MAIS TARDE
     }
 
-    for(int id = 1; id <= 5; id ++){
+    for(int id = 0; id < count; id ++){
         char buf[25];
         int len = snprintf(buf, 25, "%d - %d\n", temp[id].id, temp[id].points);
         write(fd, buf, len);
@@ -561,6 +534,10 @@ void leaderBoard(session_t** activeClients, int maxGames, pthread_mutex_t* lock)
     }
 
 
+}
+
+int getId(char buf[]){
+    return (int)(buf[6] - '0');
 }
 
 void* host_thread(void* arg) {
@@ -588,19 +565,23 @@ void* host_thread(void* arg) {
 
     while(1) {  
         if(SIGUSR1_received){
-            write(1, "A\n", 2);
-            //se o sinal foi recebido gera o relatório
             leaderBoard(activeClients, maxGames, lock);
             SIGUSR1_received = 0; //reseta
         }
 
         if(read_all(servfd, buf, sizeof(buf)) < 0 ) continue;
-       
         if(buf[0] != OP_CODE_CONNECT) continue; //error
 
         client_request_t request;
         strncpy(request.req_pipe_path, buf + 1, 40);
         strncpy(request.notif_pipe_path, buf + 1 + 40, 40);
+        int a = getId(buf);
+        debug("%d\n", a);
+        request.id = getId(buf);
+
+        char buf[12]; 
+        int len = snprintf(buf, sizeof(buf), "%d\n", request.id);
+        write(1, buf, len);
 
         sem_wait(sem_slots); //espera por uma vaga para iniciar sessão
         
@@ -615,7 +596,9 @@ void* host_thread(void* arg) {
 
         
     }
+    free(activeClients);
     free(data);
+    return NULL;
 }
 
 
@@ -637,7 +620,6 @@ void start_host(p2c_t* p2c, sem_t* sem_games, sem_t* sem_slots, char* server_pip
 }
 
 void handle_SIGUSR1(){
-    write(1, "A\n", 2);
     SIGUSR1_received = 1;
 }
 int main(int argc, char** argv) {
@@ -654,11 +636,11 @@ int main(int argc, char** argv) {
     }
 
     signal(SIGPIPE, SIG_IGN); //caso o cliente feche a ligação, não dá erro quando tentamos escrever para lá 
-    struct sigaction sa;
-    sa.sa_handler = handle_SIGUSR1;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0; // Ajuda a que o read() não morra com erro
-    sigaction(SIGUSR1, &sa, NULL); 
+    struct sigaction sa2;
+    sa2.sa_handler = handle_SIGUSR1;
+    sigemptyset(&sa2.sa_mask);
+    sa2.sa_flags = 0; // Ajuda a que o read() não morra com erro
+    sigaction(SIGUSR1, &sa2, NULL); 
     
     // Random seed for any random movements
     srand((unsigned int)time(NULL));
@@ -694,6 +676,7 @@ int main(int argc, char** argv) {
         pthread_join(gameTids[i], NULL);
     }
     free(gameTids);//organizar melhor isto
+    unload_allLevels(levels);
 
     sem_destroy(sem_games);
     free(sem_games);
@@ -704,6 +687,7 @@ int main(int argc, char** argv) {
     destroy_p2c(p2c); //liberta ponteiro "interior"
     free(p2c);
     
+    free(activeClients);
     
     //a porra do server fica a correr para sempre
     return 0;

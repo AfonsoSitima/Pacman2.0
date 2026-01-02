@@ -83,8 +83,9 @@ int main(int argc, char *argv[]) {
              "/tmp/%s_notification", client_id);
 
     open_debug_file("client-debug.log");
-    debug("%s\n", req_pipe_path);
+/*     debug("%s\n", req_pipe_path);
     debug("%s\n", notif_pipe_path);
+    debug("%s\n", client_id);*/    
     if (pacman_connect(req_pipe_path, notif_pipe_path, register_pipe) != 0) {
         perror("Failed to connect to server");
         return 1;

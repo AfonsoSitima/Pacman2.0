@@ -8,6 +8,7 @@
 typedef struct {
     char req_pipe_path[40];
     char notif_pipe_path[40];
+    int id; //id cliente
 } client_request_t;
 
 typedef struct {

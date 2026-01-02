@@ -65,6 +65,9 @@ void innit_session(session_t * session, int sessionId) {  //talvez returnar int 
   }
 
   session->id = sessionId;
+  /* char buf[12]; 
+  int len = snprintf(buf, sizeof(buf), "%d\n", sessionId);
+  write(1, buf, len); */
   return;    //fechamos os pipes no final
 }
 

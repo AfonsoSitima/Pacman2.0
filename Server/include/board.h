@@ -72,7 +72,6 @@ typedef struct {
     pthread_t pacTid;       //Thread id of pacman thread
     pthread_t ncursesTid;   //Thread id of ncurses thread
     int result;             //Store flag that decides next game action    
-    int* hasBackup;         //Flag to save if there is a backup
     int accumulated_points; //Game points 
     int can_win;          //Flag to check if level has a win condition
 
@@ -115,10 +114,9 @@ void load_ghost(board_t* board, ghost_t* ghost);
 /**
  * @brief load a level to be played.
  * @param board pointer to level to be loaded. 
- * @param hasBackup flag to control if there is a current game backup. 
  * @param accPoints points from last level.
  */
-void load_level(board_t* board, int* hasBackup, int accPoints);
+void load_level(board_t* board, int accPoints);
 
 /**
  * @brief Frees level resources.
