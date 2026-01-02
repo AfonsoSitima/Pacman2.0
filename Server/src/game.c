@@ -575,13 +575,8 @@ void* host_thread(void* arg) {
         client_request_t request;
         strncpy(request.req_pipe_path, buf + 1, 40);
         strncpy(request.notif_pipe_path, buf + 1 + 40, 40);
-        int a = getId(buf);
-        debug("%d\n", a);
-        request.id = getId(buf);
 
-        char buf[12]; 
-        int len = snprintf(buf, sizeof(buf), "%d\n", request.id);
-        write(1, buf, len);
+        request.id = getId(buf);
 
         sem_wait(sem_slots); //espera por uma vaga para iniciar sessão
         
