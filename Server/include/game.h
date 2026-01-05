@@ -116,5 +116,21 @@ void start_pacman_thread(board_t* board, session_t* game_s);
  */
 void* pacman_thread(void* arg);
 
+/**
+ * @brief get session id from a pipe name (ex: /tmp/%s_request)
+ * @return the user Id
+ */
+int getId(char buf[], int size);
+
+
+/**
+ * @brief find a free slot to store a new session on the active clients array
+ * @param maxgames max games
+ * @param activeClients every active session on the server
+ * @return the free slot;  
+ */
+int freeClientSlot(int maxgames, session_t** activeClients);
+
+
 
 #endif

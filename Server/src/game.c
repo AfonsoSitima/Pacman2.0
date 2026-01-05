@@ -413,80 +413,13 @@ void* game_thread(void* arg) {
     return NULL;
 }
 
-
-/*void start_game_threads(char * server_pipe_path, int max_games, board_t** levels) {
-    int servfd;
-    int nSessions = 0;
-    int max = max_games;
-    if (unlink(server_pipe_path) != 0 && errno != ENOENT) return NULL;
-    if (mkfifo(server_pipe_path, 0640) != 0) return NULL; //cria o pipe do servidor
-    
-    servfd = open(server_pipe_path, O_RDONLY);  //abre o pipe do servidor
-    if (servfd < 0) return NULL;
-    
-    sem_t* sem = malloc(sizeof(sem_t));
-    sem_init(sem, 0, max_games); 
-    
-    pthread_t* games = malloc(max_games * sizeof(pthread_t));
-    
-    while(1) { //não sei quando acabar o loop
-    //sem_wait(&sem);
-    char buffer[1 + 40 + 40]; //1 para o id, 40 para o req pipe path, 40 para o notif pipe path 
-    read_all(servfd, buffer, sizeof(buffer)); //lê o que o cliente enviou
-    if(buffer[0] != OP_CODE_CONNECT) return; //error
-    
-    sem_wait(&sem); //espera por uma vaga para iniciar sessão
-    
-    session_t* session = malloc(sizeof(session_t));
-    strncpy(session->req_pipe_path, buffer + 1, 40);
-    strncpy(session->notif_pipe_path, buffer + 1 + 40, 40);
-    
-        innit_session(session, &nSessions);
-        
-        //comecar as threads
-        pthread_t gameId;
-        games[nSessions - 1] = gameId;
-        pthread_innit(&gameId, NULL);
-        
-        thread_game_t* thread_data = malloc(sizeof(thread_game_t));
-        thread_data->game_s = session;
-        thread_data->levels = levels; //fazer deep copy se necessário
-        thread_data->sem = sem;
-        
-        pthread_create(&gameId, NULL, game_thread, (void*)thread_data);
-        //sem_post(&sem);
-        if (nSessions == max - 1) {      //guarda espaço para mais jogos
-            games = realloc(games, (max + max_games) * sizeof(pthread_t));
-            max += max_games;
-            }
-    }
-    for(int i = 0; i < nSessions; i++) {
-        pthread_join(games[i], NULL);
-        }
-        close(servfd);
-        sem_destroy(sem);
-        unload_allLevels(levels);
-        return;
-        }*/
        
 
 void start_game_threads(/*char * server_pipe_path,*/ int max_games, pthread_t* gameTids, board_t** levels, p2c_t* producerConsumer, sem_t* sem_games, sem_t* sem_slots, session_t** activeClients, pthread_mutex_t* clientsArrayLock) {
-    //pthread_t* games = malloc(max_games * sizeof(pthread_t));
-    //int count_levels = get_levels_count(levels);
     for (int i = 0; i < max_games; i++) {
 
-        /*pthread_t gameId;
-        games[i] = gameId;
-        pthread_innit(&gameId, NULL);
-        session_t* session = malloc(sizeof(session_t));
-        strncpy(session->req_pipe_path, producerConsumer + 1, 40);
-        strncpy(session->notif_pipe_path, producerConsumer + 1 + 40, 40);
-        innit_session(session, i); //inicia sessão sem guardar o número de sessões
-        */
         thread_game_t* thread_data = malloc(sizeof(thread_game_t));
-        //thread_data->game_s = session;
         thread_data->producerConsumer = producerConsumer;
-        //thread_data->levels = levels; //fazer deep copy se necessário
         thread_data->levels = levels;
         thread_data->sem_games = sem_games;
         thread_data->sem_slots = sem_slots;
@@ -500,55 +433,72 @@ void start_game_threads(/*char * server_pipe_path,*/ int max_games, pthread_t* g
 }
 
 int maxPoints(const void* a, const void* b) {
-    score* entryA = (score*)a;
-    score* entryB = (score*)b;
+    score* elem1 = (score*)a;
+    score* elem2 = (score*)b;
     
-    return (entryB->points - entryA->points);
+    return (elem2->points - elem1->points);
 }
 
 
 
-void leaderBoard(session_t** activeClients, int maxGames, pthread_mutex_t* lock){ // clients connected array
-    //generate leaderboard
+int leaderBoard(session_t** activeClients, int maxGames, pthread_mutex_t* lock){ // clients connected array
     debug("----GERANDO LEADERBOARD----");
     int count = 0;
-    score temp[maxGames];
-    pthread_mutex_lock(lock); //as threads do game podem estar a aceder
+    score temp[maxGames]; 
+
+    pthread_mutex_lock(lock); 
     for(int id = 0; id < maxGames; id++){
-        //computar
+        
         if(!activeClients[id]) continue;
         temp[count].id = activeClients[id]->id;
         temp[count].points = activeClients[id]->points;
         count++;
     }
     pthread_mutex_unlock(lock);
-    qsort(temp, count, sizeof(score), maxPoints);
     
-    int fd = open("leaderboard.txt", O_WRONLY | O_TRUNC | O_CREAT, 0644); 
-    if(fd == -1){
-        debug("[ERR]: LEADERBOARD FILE OPEN FAILED");
-        //TRATAR ESTE ERRO MAIS TARDE
+    qsort(temp, count, sizeof(score), maxPoints); //ordena
+    
+    int fd_leaderboard = open("leaderboard.txt", O_WRONLY | O_TRUNC | O_CREAT, 0644); 
+    if(fd_leaderboard == -1){
+        fprintf(stderr, "Leaderboard file open failed\n");
+        return 1;
     }
     
     for(int id = 0; id < count; id ++){
-        char buf[25];
-        int len = snprintf(buf, 25, "%d - %d\n", temp[id].id, temp[id].points);
-        write(fd, buf, len);
+        char buf[30]; 
+        int len = snprintf(buf, 30, "%d - %d points\n", temp[id].id, temp[id].points);
+        write(fd_leaderboard, buf, len);
     }
     
-    if(close(fd) == -1){
-        debug("[ERR]: LEADERBOARD FILE CLOSE SYSCALL FAILED");
-        //tratar mais tarde
+    if(close(fd_leaderboard) == -1){
+        fprintf(stderr, "Leaderboard file closing failed\n");
+        return 1;
     }
     
-    
+    return 0;
 }
 
-int getId(char buf[]){
-    return (int)(buf[6] - '0');
+int getId(char buf[], int size){
+    int countBars = 0;
+    int id = 0;
+    for(int i = 0; i < size; i++){
+        if(buf[i] == '/'){
+            countBars++;
+            continue;
+        }
+        if(countBars == 2){
+            if(buf[i] == '_'){
+                break;
+            }
+            id *= 10; 
+            id += (int)(buf[i] - '0'); 
+        }
+    }
+    return id;
 }
+
 int freeClientSlot(int maxgames, session_t** activeClients){
-    int slot = -1; //na prática não deve ser possível devolver -1
+    int slot = -1; 
 
     for(int i = 0; i < maxgames; i++){
         if(!activeClients[i]){
@@ -584,8 +534,9 @@ void* host_thread(void* arg) {
 
     while(1) {  
         if(SIGUSR1_received){
-            leaderBoard(activeClients, maxGames, lock);
-            SIGUSR1_received = 0; //reseta
+            if(leaderBoard(activeClients, maxGames, lock)){
+                SIGUSR1_received = 0; //reseta
+            }
         }
 
         if(read_all(servfd, buf, sizeof(buf)) < 0 ) continue;
@@ -595,7 +546,7 @@ void* host_thread(void* arg) {
         strncpy(request.req_pipe_path, buf + 1, 40);
         strncpy(request.notif_pipe_path, buf + 1 + 40, 40);
 
-        request.id = getId(buf);
+        request.id = getId(buf, 40);
 
         sem_wait(sem_slots); //espera por uma vaga para iniciar sessão
 
@@ -677,6 +628,16 @@ int main(int argc, char** argv) {
     
     //lista de sessões abertas
     session_t** activeClients = calloc(maxGames, sizeof(session_t*));
+    //verificar erro no calloc
+    if(!activeClients){
+        fprintf(stderr, "[ERR]: Client list calloc failed\n");
+        free(sem_games);
+        free(sem_slots);
+        unload_allLevels(levels);
+        free(p2c);
+        exit(EXIT_FAILURE);
+    }
+
 
     pthread_mutex_init(&p2c->lock, NULL);
     innit_p2c(p2c, maxGames);
@@ -709,103 +670,7 @@ int main(int argc, char** argv) {
     
     free(activeClients);
     
-    //a porra do server fica a correr para sempre
     return 0;
 }
 
 
-
-/*int main(int argc, char** argv) {
-    if (argc != 3 && argc != 4) {
-        fprintf(stderr,
-            "Usage: %s <levels_dir> <max_games> <register_pipe>\n",
-            argv[0]);
-        exit(EXIT_FAILURE);
-    }
-    // Random seed for any random movements
-    srand((unsigned int)time(NULL));
-    open_debug_file("debug.log");
-
-        //ETAPA 1.1
-    //assumir sempre max_games = 1
-    int numS = 0;
-    //session_t* game_s = innit_session(argv[3], &numS, 1);
-    
-
-    board_t** levels = handle_files(argv[1]);
-
-    //terminal_init();
-    int result;
-    int indexLevel = 0;
-    int tempPoints = 0; //acumulated points between levels
-    board_t *game_board = NULL;
-    bool end_game = false;
-    int* hasBackUp = malloc(sizeof(int));
-    *hasBackUp = 0;
-
-
-
-    while (!end_game) {
-
-        game_board = levels[indexLevel];
-        game_board->hasBackup = hasBackUp;
-
-        if (levels[indexLevel + 1] == NULL) {
-            end_game = true; //pode dar victory aqui
-            game_board->can_win = 1;
-        }
-        
-        load_level(game_board, hasBackUp, tempPoints); 
-
-        //start_ncurses_thread(game_board);
-        start_server_thread(game_board, game_s);
-        start_pacman_thread(game_board, game_s);
-        //start_server_thread(game_board, game_s);
-        start_ghost_threads(game_board);
-
-        pthread_join(game_board->pacTid, NULL); //waits for pacman thread to end
-
-        result = game_board->result; //get result of the game
-
-        pthread_rwlock_wrlock(&game_board->board_lock);
-        game_board->active = 0;   //stop other threads
-        pthread_rwlock_unlock(&game_board->board_lock);
-        
-        //pthread_join(game_board->ncursesTid, NULL);
-        pthread_join(serverId, NULL);
-        stop_ghost_threads(game_board);
-
-        switch (result) {
-            case NEXT_LEVEL:
-                //screen_refresh(game_board, DRAW_WIN);
-                //sleep_ms(game_board->tempo); 
-                tempPoints = game_board->pacmans[0].points;
-                indexLevel++;
-                break;
-            
-            case LOAD_BACKUP:
-                exit(1);
-                break;
-            case CREATE_BACKUP:
-                tempPoints = game_board->pacmans[0].points;
-                end_game = (createBackup(game_board) == 1) ? true : false;
-                break;
-            case QUIT_GAME:
-                //screen_refresh(game_board, DRAW_GAME_OVER); 
-                //sleep_ms(game_board->tempo);
-                end_game = true;
-                break;
-            default:
-                break;
-        }
-        print_board(game_board);
-    }
-    unload_allLevels(levels);
-    free(hasBackUp);
-    disconnect_session(game_s);
-    //terminal_cleanup();
-    close_debug_file();
-
-    return 0;
-}
-*/
