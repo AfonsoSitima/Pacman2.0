@@ -14,6 +14,7 @@ typedef struct {
     char req_pipe_path[MAX_PIPE_PATH_LENGTH + 1];
     char notif_pipe_path[MAX_PIPE_PATH_LENGTH + 1];
     int points;
+    int slot; //slot na lista de todos os clients ativos
 } session_t;
 
 int read_all(int fd, char *buf, size_t len);

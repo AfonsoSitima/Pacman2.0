@@ -151,23 +151,24 @@ int main(int argc, char *argv[]) {
         /*if (command == '\0')
             continue;
         */
-        if (command == 'Q') {
-            debug("Client pressed 'Q', quitting game\n");
-            break;
-        }
 
         debug("Command: %c\n", command);
 
         pacman_play(command);
+
+        if (command == 'Q') {
+            debug("Client pressed 'Q', quitting game\n");
+            break;
+        } 
 
     }
 
     debug("Waiting for receiver thread to finish...\n");
 
     pthread_join(receiver_thread_id, NULL);
-
+    
     debug("Disconnecting from server...\n");
-
+    
     pacman_disconnect();
 
     sleep_ms(1000);

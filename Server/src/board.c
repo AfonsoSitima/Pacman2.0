@@ -597,6 +597,9 @@ void print_board(board_t *board) {
 } */
 
 board_t* level_copy(board_t* original){
+
+
+
     board_t* newLevel = malloc(sizeof(board_t));
         
     memcpy(newLevel, original, sizeof(board_t));
@@ -625,7 +628,7 @@ board_t* level_copy(board_t* original){
         pthread_rwlock_init(&newLevel->pacmans[p].lock, NULL);
 
     // tid: deep copy (ou null)
-    original->tid = malloc(sizeof(pthread_t) * original->n_ghosts);
+    newLevel->tid = malloc(sizeof(pthread_t) * original->n_ghosts);
 
     // threads antigas não fazem sentido
     newLevel->pacTid = 0;
