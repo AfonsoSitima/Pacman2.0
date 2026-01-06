@@ -598,8 +598,6 @@ void print_board(board_t *board) {
 
 board_t* level_copy(board_t* original){
 
-
-
     board_t* newLevel = malloc(sizeof(board_t));
         
     memcpy(newLevel, original, sizeof(board_t));

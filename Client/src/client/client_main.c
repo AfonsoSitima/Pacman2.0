@@ -15,8 +15,13 @@
 Board board;
 bool stop_execution = false;
 int tempo;
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_rwlock_t temp_lock = PTHREAD_RWLOCK_INITIALIZER;
+pthread_mutex_t ready_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_rwlock_t execution = PTHREAD_RWLOCK_INITIALIZER;
+
+
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t ncurses = PTHREAD_MUTEX_INITIALIZER;
 bool board_ready = false;
 
 static void *receiver_thread(void *arg) {
@@ -27,28 +32,36 @@ static void *receiver_thread(void *arg) {
 
         if (!board.data || board.game_over == 1 || board.victory == 1) {
             debug("Game over received, stopping receiver thread...\n");
-            pthread_mutex_lock(&mutex);
+            pthread_rwlock_wrlock(&execution);
             stop_execution = true;
-            pthread_mutex_unlock(&mutex);
+            pthread_rwlock_unlock(&execution);
             break;
         }
 
-        pthread_mutex_lock(&mutex);
+
+        pthread_rwlock_wrlock(&temp_lock);
         tempo = board.tempo;
         if (!board_ready && tempo > 0) {
+
+            pthread_mutex_lock(&ready_lock);
             board_ready = true;
+            pthread_mutex_unlock(&ready_lock);
             pthread_cond_broadcast(&cond);  // acorda o main
         }
-        pthread_mutex_unlock(&mutex);
+        pthread_rwlock_unlock(&temp_lock);
+        
 
+
+        pthread_mutex_lock(&ncurses);
         draw_board_client(board);
         refresh_screen();
-        free(board.data); //free tabuleiro
+        pthread_mutex_unlock(&ncurses);
     }
     debug("Returning receiver thread...\n");
+    pthread_mutex_lock(&ncurses);
     draw_board_client(board);
     refresh_screen();
-    free(board.data);
+    pthread_mutex_unlock(&ncurses);
     return NULL;
 }
 
@@ -83,9 +96,8 @@ int main(int argc, char *argv[]) {
              "/tmp/%s_notification", client_id);
 
     open_debug_file("client-debug.log");
-/*     debug("%s\n", req_pipe_path);
+    debug("%s\n", req_pipe_path);
     debug("%s\n", notif_pipe_path);
-    debug("%s\n", client_id);*/    
     if (pacman_connect(req_pipe_path, notif_pipe_path, register_pipe) != 0) {
         perror("Failed to connect to server");
         return 1;
@@ -97,24 +109,26 @@ int main(int argc, char *argv[]) {
     pthread_t receiver_thread_id;
     pthread_create(&receiver_thread_id, NULL, receiver_thread, NULL);
 
+    pthread_mutex_lock(&ncurses);
     draw_board_client(board);
     refresh_screen();
+    pthread_mutex_unlock(&ncurses);
 
-    pthread_mutex_lock(&mutex);
-    while (!board_ready && !stop_execution) pthread_cond_wait(&cond, &mutex);
-    pthread_mutex_unlock(&mutex);
+    pthread_mutex_lock(&ready_lock);
+    while (!board_ready) pthread_cond_wait(&cond, &ready_lock);
+    pthread_mutex_unlock(&ready_lock);
 
     char command;
     int ch;
 
     while (1) {
 
-        pthread_mutex_lock(&mutex);
+        pthread_rwlock_rdlock(&execution);
         if (stop_execution){
-            pthread_mutex_unlock(&mutex);
+            pthread_rwlock_unlock(&execution);
             break;
         }
-        pthread_mutex_unlock(&mutex);
+        pthread_rwlock_unlock(&execution);
 
         if (cmd_fp) {
             // Input from file
@@ -134,41 +148,34 @@ int main(int argc, char *argv[]) {
             command = toupper(command);
             
             // Wait for tempo, to not overflow pipe with requests
-            pthread_mutex_lock(&mutex);
-            int wait_for = tempo;
-            pthread_mutex_unlock(&mutex);
-
-            sleep_ms(wait_for);
-            debug("wait_for : %d\n", tempo);
-            debug("wait_for2 : %d\n", wait_for);
             
         } else {
             // Interactive input
+            pthread_mutex_lock(&ncurses);
             command = get_input();
+            pthread_mutex_unlock(&ncurses);
             command = toupper(command);
         }
+        pthread_rwlock_rdlock(&temp_lock);
+        int wait_for = tempo;
+        pthread_rwlock_unlock(&temp_lock);
 
-        /*if (command == '\0')
-            continue;
-        */
+        sleep_ms(wait_for);
+        debug("wait_for : %d\n", tempo);
+        debug("wait_for2 : %d\n", wait_for);
 
         debug("Command: %c\n", command);
 
         pacman_play(command);
-
-        if (command == 'Q') {
-            debug("Client pressed 'Q', quitting game\n");
-            break;
-        } 
 
     }
 
     debug("Waiting for receiver thread to finish...\n");
 
     pthread_join(receiver_thread_id, NULL);
-    
+
     debug("Disconnecting from server...\n");
-    
+
     pacman_disconnect();
 
     sleep_ms(1000);
@@ -177,10 +184,12 @@ int main(int argc, char *argv[]) {
     if (cmd_fp)
         fclose(cmd_fp);
 
-    pthread_mutex_destroy(&mutex);
+    pthread_rwlock_destroy(&temp_lock);
+    pthread_mutex_destroy(&ready_lock);
+    pthread_rwlock_destroy(&execution);
+    pthread_cond_destroy(&cond);
 
     terminal_cleanup();
-    close_debug_file();
 
     return 0;
 }

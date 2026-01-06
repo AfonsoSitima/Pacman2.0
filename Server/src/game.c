@@ -110,6 +110,9 @@ int play_board(board_t * game_board, session_t* game_s) {
 
 
     if (play->command == 'Q') {
+        pthread_rwlock_wrlock(&pacman->lock);
+        pacman->alive = 0;
+        pthread_rwlock_unlock(&pacman->lock);
         free(play);
         return QUIT_GAME;
     }
@@ -196,7 +199,7 @@ void* pacman_thread(void* arg) {
     board_t* board = data->board;
     session_t* game_s = data->game_s;
     while (1) {
-        sleep_ms(board->tempo); 
+        //sleep_ms(board->tempo); 
         int play = play_board(board, game_s);
         if (play == CONTINUE_PLAY)
             continue;
@@ -220,7 +223,9 @@ void start_pacman_thread(board_t* board, session_t* game_s) {
 char* boardToChar(board_t* board){
     char* boardChar = malloc((board->height * board->width) * sizeof(char));
     for(int i = 0, k = 0; i < board->width * board->height; i++, k++){
+        pthread_rwlock_rdlock(&board->board[i].lock);
         board_pos_t cell = board->board[i];
+        pthread_rwlock_unlock(&board->board[i].lock);
         if(cell.content == 'o'){
             if(cell.has_portal){
                 boardChar[k] = '@';
@@ -275,15 +280,18 @@ void* server_thread(void* arg){
         memcpy(buf + 1 + sizeof(int) * 4, &game_over, sizeof(int));
         memcpy(buf + 1 + sizeof(int) * 5, &accumulated_points, sizeof(int));
 
-        write_all(game_s->notif_pipe, buf, sizeof(buf));
-        //LOCK TABULEIRO
-        //read lock tabuleiro
-        //Função para meter tabuleiro em char
-        char* boardChar = boardToChar(board);
+        write_all(game_s->notif_pipe, buf, sizeof(buf)) 
+        
 
+        //Função para meter tabuleiro em char
+        
+        char* boardChar = boardToChar(board);
         //debug("%s\n", buf);
         
-        write_all(game_s->notif_pipe, boardChar, board->height * board->width);
+        write_all(game_s->notif_pipe, boardChar, board->height * board->width) < 0)
+   
+        
+        
         //pthread_rwlock_unlock(&board->board_lock);
         //debug("%s\n", boardChar);
         free(boardChar);
@@ -467,7 +475,10 @@ int leaderBoard(session_t** activeClients, int maxGames, pthread_mutex_t* lock){
     for(int id = 0; id < count; id ++){
         char buf[30]; 
         int len = snprintf(buf, 30, "%d - %d points\n", temp[id].id, temp[id].points);
-        write(fd_leaderboard, buf, len);
+        if(write(fd_leaderboard, buf, len) < 0){
+            fprintf(stderr, "Leaderboard file write failed\n");
+            return 1;
+        }
     }
     
     if(close(fd_leaderboard) == -1){
@@ -545,7 +556,8 @@ void* host_thread(void* arg) {
         client_request_t request;
         strncpy(request.req_pipe_path, buf + 1, 40);
         strncpy(request.notif_pipe_path, buf + 1 + 40, 40);
-
+        request.req_pipe_path[39] = '\0';
+        request.notif_pipe_path[39] = '\0';
         request.id = getId(buf, 40);
 
         sem_wait(sem_slots); //espera por uma vaga para iniciar sessão
@@ -562,8 +574,6 @@ void* host_thread(void* arg) {
         sem_post(sem_games); //sinaliza que há um novo jogo para iniciar
 
 
-
-        
     }
     free(activeClients);
     free(data);
@@ -574,7 +584,7 @@ void* host_thread(void* arg) {
 //-------------------RESOLVER-----------------------------------------------
 //AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 pthread_t hostId;
-//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
 
 void start_host(p2c_t* p2c, sem_t* sem_games, sem_t* sem_slots, char* server_pipe_path, session_t** activeClients, int maxGames, pthread_mutex_t* lock) {
     thread_host_t* data = malloc(sizeof(thread_host_t));
@@ -630,7 +640,7 @@ int main(int argc, char** argv) {
     session_t** activeClients = calloc(maxGames, sizeof(session_t*));
     //verificar erro no calloc
     if(!activeClients){
-        fprintf(stderr, "[ERR]: Client list calloc failed\n");
+        fprintf(stderr, "Client list calloc failed\n");
         free(sem_games);
         free(sem_slots);
         unload_allLevels(levels);
