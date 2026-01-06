@@ -29,6 +29,7 @@
 #define GHOST 2
 
 volatile sig_atomic_t SIGUSR1_received = 0; //variável global para o estado do signal 
+//volatile sig_atomic_t   _received = 0;
 
 
 //pthread_t serverId;

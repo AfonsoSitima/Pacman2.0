@@ -28,7 +28,10 @@ static void *receiver_thread(void *arg) {
     (void)arg;
 
     while (true) {
-        board = receive_board_update();
+        if(board.data){
+            free(board.data);
+        }
+            board = receive_board_update();
 
         if (!board.data || board.game_over == 1 || board.victory == 1) {
             debug("Game over received, stopping receiver thread...\n");
@@ -62,6 +65,7 @@ static void *receiver_thread(void *arg) {
     draw_board_client(board);
     refresh_screen();
     pthread_mutex_unlock(&ncurses);
+    free(board.data);
     return NULL;
 }
 
@@ -109,10 +113,10 @@ int main(int argc, char *argv[]) {
     pthread_t receiver_thread_id;
     pthread_create(&receiver_thread_id, NULL, receiver_thread, NULL);
 
-    pthread_mutex_lock(&ncurses);
-    draw_board_client(board);
-    refresh_screen();
-    pthread_mutex_unlock(&ncurses);
+    //pthread_mutex_lock(&ncurses);
+    //draw_board_client(board);
+    //refresh_screen();
+    //pthread_mutex_unlock(&ncurses);
 
     pthread_mutex_lock(&ready_lock);
     while (!board_ready) pthread_cond_wait(&cond, &ready_lock);
@@ -180,7 +184,7 @@ int main(int argc, char *argv[]) {
 
     sleep_ms(1000);
     debug("Exiting main...\n");
-
+    close_debug_file();
     if (cmd_fp)
         fclose(cmd_fp);
 
