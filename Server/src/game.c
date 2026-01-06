@@ -280,7 +280,7 @@ void* server_thread(void* arg){
         memcpy(buf + 1 + sizeof(int) * 4, &game_over, sizeof(int));
         memcpy(buf + 1 + sizeof(int) * 5, &accumulated_points, sizeof(int));
 
-        write_all(game_s->notif_pipe, buf, sizeof(buf)) 
+        write_all(game_s->notif_pipe, buf, sizeof(buf));
         
 
         //Função para meter tabuleiro em char
@@ -288,7 +288,7 @@ void* server_thread(void* arg){
         char* boardChar = boardToChar(board);
         //debug("%s\n", buf);
         
-        write_all(game_s->notif_pipe, boardChar, board->height * board->width) < 0)
+        write_all(game_s->notif_pipe, boardChar, board->height * board->width);
    
         
         

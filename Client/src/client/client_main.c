@@ -158,10 +158,10 @@ int main(int argc, char *argv[]) {
         }
         pthread_rwlock_rdlock(&temp_lock);
         int wait_for = tempo;
+        debug("wait_for : %d\n", tempo);
         pthread_rwlock_unlock(&temp_lock);
 
         sleep_ms(wait_for);
-        debug("wait_for : %d\n", tempo);
         debug("wait_for2 : %d\n", wait_for);
 
         debug("Command: %c\n", command);
