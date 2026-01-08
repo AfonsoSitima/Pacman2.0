@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
     }
 
     terminal_init();
-    set_timeout(500);
+    //set_timeout(500);
 
     pthread_t receiver_thread_id;
     pthread_create(&receiver_thread_id, NULL, receiver_thread, NULL);
