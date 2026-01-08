@@ -556,8 +556,8 @@ void* host_thread(void* arg) {
 
         client_request_t request;
         strncpy(request.req_pipe_path, buf + 1, 40);
-        strncpy(request.notif_pipe_path, buf + 1 + 40, 40);
         request.req_pipe_path[39] = '\0';
+        strncpy(request.notif_pipe_path, buf + 1 + 40, 40);
         request.notif_pipe_path[39] = '\0';
         request.id = getId(buf, 40);
 
