@@ -63,8 +63,10 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
   char msg[1 + 40 + 40];
   memset(msg, 0, sizeof(msg));
   msg[0] = OP_CODE_CONNECT;
-  memcpy(msg + 1, req_pipe_path, 40);
-  memcpy(msg + 1 + 40, notif_pipe_path, 40);
+
+  strncpy(msg + 1, req_pipe_path, 39);
+  strncpy(msg + 1 + 40, notif_pipe_path, 39);
+
   if (write_all(servfd, msg, sizeof(msg)) != 0) {
     close(servfd);
     return 1;
@@ -123,9 +125,7 @@ int pacman_play(char command) {
 int pacman_disconnect() {
   char buf[1];
   buf[0] = OP_CODE_DISCONNECT;
-  if(write_all(session.req_pipe, buf, 1) < 0 ){
-    return -1;
-  }
+  write_all(session.req_pipe, buf, 1);
 
   close(session.req_pipe);
   close(session.notif_pipe);
