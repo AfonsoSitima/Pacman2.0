@@ -581,7 +581,7 @@ void* host_thread(void* arg) {
 
 
 
-void start_host(pthread_t hostId, p2c_t* p2c, sem_t* sem_games, char* server_pipe_path, session_t** activeClients, int maxGames, pthread_mutex_t* lock) {
+void start_host(pthread_t* hostId, p2c_t* p2c, sem_t* sem_games, char* server_pipe_path, session_t** activeClients, int maxGames, pthread_mutex_t* lock) {
     thread_host_t* data = malloc(sizeof(thread_host_t));
     data->producerConsumer = p2c;
     data->sem_games = sem_games;
@@ -589,7 +589,7 @@ void start_host(pthread_t hostId, p2c_t* p2c, sem_t* sem_games, char* server_pip
     data->activeClients = activeClients;
     data->maxGames = maxGames;
     data->clientsArrayLock = lock;
-    pthread_create(&hostId, NULL, host_thread, (void*)data);
+    pthread_create(hostId, NULL, host_thread, (void*)data);
 }
 
 void handle_SIGUSR1(){
@@ -653,7 +653,7 @@ int main(int argc, char** argv) {
     
     pthread_mutex_t clients_lock;
     pthread_mutex_init(&clients_lock, NULL);
-    start_host(hostId, p2c, sem_games, sv_pipe, activeClients, maxGames, &clients_lock);
+    start_host(&hostId, p2c, sem_games, sv_pipe, activeClients, maxGames, &clients_lock);
     pthread_t* gameTids = malloc(sizeof(pthread_t) * maxGames);
         
     if(!gameTids){
