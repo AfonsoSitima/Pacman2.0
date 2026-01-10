@@ -580,12 +580,8 @@ void* host_thread(void* arg) {
 }
 
 
-//-------------------RESOLVER-----------------------------------------------
-//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-pthread_t hostId;
 
-
-void start_host(p2c_t* p2c, sem_t* sem_games, char* server_pipe_path, session_t** activeClients, int maxGames, pthread_mutex_t* lock) {
+void start_host(pthread_t hostId, p2c_t* p2c, sem_t* sem_games, char* server_pipe_path, session_t** activeClients, int maxGames, pthread_mutex_t* lock) {
     thread_host_t* data = malloc(sizeof(thread_host_t));
     data->producerConsumer = p2c;
     data->sem_games = sem_games;
@@ -632,11 +628,14 @@ int main(int argc, char** argv) {
     srand((unsigned int)time(NULL));
     open_debug_file("debug.log");
 
+    char sv_pipe[MAX_PIPE_PATH_LENGTH];
+    snprintf(sv_pipe, MAX_PIPE_PATH_LENGTH, "/tmp/%s", argv[3]);
+    debug("%s\n", sv_pipe);
 
     sem_t* sem_games = malloc(sizeof(sem_t)); //ver se o jogo pode começar
     board_t ** levels = handle_files(argv[1]);
     p2c_t* p2c = malloc(sizeof(p2c_t));
-        
+    pthread_t hostId;
 
     int maxGames = atoi(argv[2]);
     
@@ -654,7 +653,7 @@ int main(int argc, char** argv) {
     
     pthread_mutex_t clients_lock;
     pthread_mutex_init(&clients_lock, NULL);
-    start_host(p2c, sem_games, argv[3], activeClients, maxGames, &clients_lock);
+    start_host(hostId, p2c, sem_games, sv_pipe, activeClients, maxGames, &clients_lock);
     pthread_t* gameTids = malloc(sizeof(pthread_t) * maxGames);
         
     if(!gameTids){

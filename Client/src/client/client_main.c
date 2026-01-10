@@ -96,7 +96,6 @@ int main(int argc, char *argv[]) {
     }
 
     const char *client_id = argv[1];
-    const char *register_pipe = argv[2];
     const char *commands_file = (argc == 4) ? argv[3] : NULL;
 
     FILE *cmd_fp = NULL;
@@ -107,7 +106,8 @@ int main(int argc, char *argv[]) {
             return 1;
         }
     }
-
+    
+    char sv_pipe[MAX_PIPE_PATH_LENGTH];
     char req_pipe_path[MAX_PIPE_PATH_LENGTH];
     char notif_pipe_path[MAX_PIPE_PATH_LENGTH];
 
@@ -117,10 +117,13 @@ int main(int argc, char *argv[]) {
     snprintf(notif_pipe_path, MAX_PIPE_PATH_LENGTH,
              "/tmp/%s_notification", client_id);
 
+    snprintf(sv_pipe, MAX_PIPE_PATH_LENGTH, 
+                "/tmp/%s", argv[2]);
+
     open_debug_file("client-debug.log");
     debug("%s\n", req_pipe_path);
     debug("%s\n", notif_pipe_path);
-    if (pacman_connect(req_pipe_path, notif_pipe_path, register_pipe) != 0) {
+    if (pacman_connect(req_pipe_path, notif_pipe_path, sv_pipe) != 0) {
         perror("Failed to connect to server");
         return 1;
     }
