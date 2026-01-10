@@ -36,24 +36,40 @@ volatile sig_atomic_t SIGUSR1_received = 0; //variável global para o estado do 
 
 //maybe fazer esta parte noutro ficheiro
 void innit_p2c(p2c_t* p2c, int max_games) {
-    p2c->client_request = malloc(max_games * sizeof(client_request_t));
-    p2c->head = 0;
-    p2c->tail = 0;
+    //p2c->client_request = malloc(max_games * sizeof(client_request_t));
+    p2c->head = NULL;
+    p2c->tail = NULL;
     p2c->max_size = max_games;
 }
 
 void destroy_p2c(p2c_t* p2c) {
-    free(p2c->client_request);
+    //free(p2c->client_request);
+    for (client_request_t* curr = p2c->head; curr != NULL; ) {
+        client_request_t* next = curr->next;
+        free(curr);
+        curr = next;
+    }
 }
 
 void enqueue_p2c(p2c_t* p2c, client_request_t* request) {
-    p2c->client_request[p2c->tail] = *request;
-    p2c->tail = (p2c->tail + 1) % p2c->max_size;
+    request->next = NULL;
+    if (p2c->head == NULL) {
+        p2c->head = request;
+        p2c->tail = request;
+    }
+    else {
+        p2c->tail->next = request;
+        p2c->tail = request;
+    }
 }
 
-client_request_t pop_p2c(p2c_t* p2c) {
-    client_request_t request = p2c->client_request[p2c->head];
-    p2c->head = (p2c->head + 1) % p2c->max_size;
+client_request_t* pop_p2c(p2c_t* p2c) {
+    client_request_t* request = p2c->head;
+    if (!p2c->head) return NULL;
+    p2c->head = p2c->head->next;
+    if (p2c->head == NULL) {
+        p2c->tail = NULL;
+    }
     return request;
 }
 
@@ -79,27 +95,7 @@ int play_board(board_t * game_board, session_t* game_s) {
         free(play);
         return QUIT_GAME;
     }
-
-    /*if (pacman->n_moves == 0) { // if is user input
-        pthread_mutex_lock(&game_board->ncurses_lock);
-        c.command = get_input();
-        pthread_mutex_unlock(&game_board->ncurses_lock);
-
-        if(c.command == '\0') {
-            debug("NO INPUT\n");
-            return CONTINUE_PLAY;
-        }
-        c.turns = 1;
-        play = &c;
-    }
-    else { // else if the moves are pre-defined in the file
-        // avoid buffer overflow wrapping around with modulo of n_moves
-        // this ensures that we always access a valid move for the pacman
-        play = &pacman->moves[pacman->current_move%pacman->n_moves];
-    }*/
-
-    //não sei como é que funciona a cena de turns com a implementação com servers
-
+    
     play->command = get_pacman_command(game_s);
     debug("Received command: %c\n", play->command);
     play->turns = 1;
@@ -317,7 +313,7 @@ void start_server_thread(board_t* board, session_t* game_s, pthread_t* serverId)
 
 
 
-void* game_thread(void* arg) {
+void* game_thread(void* arg) {  //1 2 3 4 5
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
@@ -328,9 +324,9 @@ void* game_thread(void* arg) {
     p2c_t* producerConsumer = data->producerConsumer;
     board_t** levels = data->levels;
     sem_t* sem_games = data->sem_games;
-    sem_t* sem_slots = data->sem_slots;
     session_t** activeClients = data->activeClients;
     pthread_mutex_t* lock = data->clientsArrayLock;
+    int slot = data->id;
     
     char req_file_path[40];
     char notif_file_path[40];
@@ -338,14 +334,15 @@ void* game_thread(void* arg) {
         sem_wait(sem_games); //espera por um novo jogo para iniciar
 
         pthread_mutex_lock(&producerConsumer->lock);     //ler dados do produtor consumidor
-        client_request_t request = pop_p2c(producerConsumer);
-        strncpy(req_file_path, request.req_pipe_path, 40);
-        strncpy(notif_file_path, request.notif_pipe_path, 40);
-        int id = request.id;
-        int slot = request.slot;
+        client_request_t* request = pop_p2c(producerConsumer);
+        strncpy(req_file_path, request->req_pipe_path, 40);
+        strncpy(notif_file_path, request->notif_pipe_path, 40);
+        int id = request->id;
+        //int slot = request->slot;
+        free(request);
 
         pthread_mutex_unlock(&producerConsumer->lock);
-                
+
         session_t *game_s = malloc(sizeof(session_t));
         strncpy(game_s->req_pipe_path, req_file_path, 40);
         strncpy(game_s->notif_pipe_path, notif_file_path, 40);
@@ -415,7 +412,6 @@ void* game_thread(void* arg) {
         pthread_mutex_lock(lock);
         activeClients[slot] = NULL; // remove client dos ativos
         pthread_mutex_unlock(lock);
-        sem_post(sem_slots);
     }
     pthread_mutex_destroy(lock);
     free(data);
@@ -424,14 +420,13 @@ void* game_thread(void* arg) {
 
        
 
-void start_game_threads(/*char * server_pipe_path,*/ int max_games, pthread_t* gameTids, board_t** levels, p2c_t* producerConsumer, sem_t* sem_games, sem_t* sem_slots, session_t** activeClients, pthread_mutex_t* clientsArrayLock) {
+void start_game_threads(/*char * server_pipe_path,*/ int max_games, pthread_t* gameTids, board_t** levels, p2c_t* producerConsumer, sem_t* sem_games, session_t** activeClients, pthread_mutex_t* clientsArrayLock) {
     for (int i = 0; i < max_games; i++) {
 
         thread_game_t* thread_data = malloc(sizeof(thread_game_t));
         thread_data->producerConsumer = producerConsumer;
         thread_data->levels = levels;
         thread_data->sem_games = sem_games;
-        thread_data->sem_slots = sem_slots;
         thread_data->activeClients = activeClients;
         thread_data->clientsArrayLock = clientsArrayLock;
         thread_data->id = i;
@@ -509,7 +504,7 @@ int getId(char buf[], int size){
     return id;
 }
 
-int freeClientSlot(int maxgames, session_t** activeClients){
+/*int freeClientSlot(int maxgames, session_t** activeClients){
     int slot = -1; 
 
     for(int i = 0; i < maxgames; i++){
@@ -519,7 +514,7 @@ int freeClientSlot(int maxgames, session_t** activeClients){
         }
     }
     return slot;
-}
+}*/
 
 void* host_thread(void* arg) {
     sigset_t set;
@@ -530,7 +525,6 @@ void* host_thread(void* arg) {
     thread_host_t* data = (thread_host_t*)arg;
     p2c_t* producerConsumer = data->producerConsumer;
     sem_t* sem_games = data->sem_games;
-    sem_t* sem_slots = data->sem_slots;
     session_t** activeClients = data->activeClients;    
     char* server_pipe_path = data->server_pipe_path;
     pthread_mutex_t* lock = data->clientsArrayLock;
@@ -554,21 +548,19 @@ void* host_thread(void* arg) {
         if(read_all(servfd, buf, sizeof(buf)) < 0 ) continue;
         if(buf[0] != OP_CODE_CONNECT) continue; //error
 
-        client_request_t request;
-        strncpy(request.req_pipe_path, buf + 1, 40);
-        request.req_pipe_path[39] = '\0';
-        strncpy(request.notif_pipe_path, buf + 1 + 40, 40);
-        request.notif_pipe_path[39] = '\0';
-        request.id = getId(buf, 40);
+        client_request_t *request = malloc(sizeof(client_request_t));
+        strncpy(request->req_pipe_path, buf + 1, 40);
+        request->req_pipe_path[39] = '\0';
+        strncpy(request->notif_pipe_path, buf + 1 + 40, 40);
+        request->notif_pipe_path[39] = '\0';
+        request->id = getId(buf + 1, 40);
 
-        sem_wait(sem_slots); //espera por uma vaga para iniciar sessão
-
-        pthread_mutex_lock(lock);
-        request.slot = freeClientSlot(maxGames, activeClients); //index no array de todos os clients
-        pthread_mutex_unlock(lock);
+        //pthread_mutex_lock(lock);
+        //request->slot = freeClientSlot(maxGames, activeClients); //index no array de todos os clients
+        //pthread_mutex_unlock(lock);
 
         pthread_mutex_lock(&producerConsumer->lock);     //escrever dados no produtor consumidor
-        enqueue_p2c(producerConsumer, &request);
+        enqueue_p2c(producerConsumer, request);
         pthread_mutex_unlock(&producerConsumer->lock);
 
 
@@ -587,11 +579,10 @@ void* host_thread(void* arg) {
 pthread_t hostId;
 
 
-void start_host(p2c_t* p2c, sem_t* sem_games, sem_t* sem_slots, char* server_pipe_path, session_t** activeClients, int maxGames, pthread_mutex_t* lock) {
+void start_host(p2c_t* p2c, sem_t* sem_games, char* server_pipe_path, session_t** activeClients, int maxGames, pthread_mutex_t* lock) {
     thread_host_t* data = malloc(sizeof(thread_host_t));
     data->producerConsumer = p2c;
     data->sem_games = sem_games;
-    data->sem_slots = sem_slots;
     data->server_pipe_path = server_pipe_path;
     data->activeClients = activeClients;
     data->maxGames = maxGames;
@@ -630,7 +621,6 @@ int main(int argc, char** argv) {
 
 
     sem_t* sem_games = malloc(sizeof(sem_t)); //ver se o jogo pode começar
-    sem_t* sem_slots = malloc(sizeof(sem_t)); //ver se há lugares disponiveis para iniciar sessão
     board_t ** levels = handle_files(argv[1]);
     p2c_t* p2c = malloc(sizeof(p2c_t));
         
@@ -643,7 +633,6 @@ int main(int argc, char** argv) {
     if(!activeClients){
         fprintf(stderr, "Client list calloc failed\n");
         free(sem_games);
-        free(sem_slots);
         unload_allLevels(levels);
         free(p2c);
         exit(EXIT_FAILURE);
@@ -653,14 +642,13 @@ int main(int argc, char** argv) {
     pthread_mutex_init(&p2c->lock, NULL);
     innit_p2c(p2c, maxGames);
     sem_init(sem_games, 0, 0);
-    sem_init(sem_slots, 0, maxGames);
     
     pthread_mutex_t clients_lock;
     pthread_mutex_init(&clients_lock, NULL);
-    start_host(p2c, sem_games, sem_slots, argv[3], activeClients, maxGames, &clients_lock);
+    start_host(p2c, sem_games, argv[3], activeClients, maxGames, &clients_lock);
     pthread_t* gameTids = malloc(sizeof(pthread_t) * maxGames);
     
-    start_game_threads(/*argv[3],*/ maxGames, gameTids, levels, p2c, sem_games, sem_slots, activeClients, &clients_lock);
+    start_game_threads(/*argv[3],*/ maxGames, gameTids, levels, p2c, sem_games, activeClients, &clients_lock);
     
 
     pthread_join(hostId, NULL);
@@ -672,8 +660,6 @@ int main(int argc, char** argv) {
 
     sem_destroy(sem_games);
     free(sem_games);
-    sem_destroy(sem_slots);
-    free(sem_slots);
     
     pthread_mutex_destroy(&p2c->lock);
     destroy_p2c(p2c); //liberta ponteiro "interior"

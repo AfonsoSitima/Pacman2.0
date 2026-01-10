@@ -10,12 +10,12 @@ typedef struct {
     char notif_pipe_path[40];
     int id; //id cliente
     int slot; //index no array de active players
+    client_request_t* next;
 } client_request_t;
 
 typedef struct {
-    client_request_t* client_request;
-    int head; //proximo a sair
-    int tail; //proximo a entrar
+    client_request_t* head;
+    client_request_t* tail;
     int max_size;
     pthread_mutex_t lock;
 } p2c_t;  //producer to consumer
@@ -43,7 +43,6 @@ typedef struct {
     board_t** levels;
     session_t* game_s;
     sem_t* sem_games;
-    sem_t* sem_slots;
     p2c_t* producerConsumer;
     session_t** activeClients; // lista dos clients;
     pthread_mutex_t *clientsArrayLock;
@@ -54,7 +53,6 @@ typedef struct {
     char* server_pipe_path;
     p2c_t* producerConsumer;
     sem_t* sem_games;
-    sem_t* sem_slots;
     session_t** activeClients; //clients ativos (para depois ver pontuações)
     pthread_mutex_t *clientsArrayLock;
     int maxGames;
