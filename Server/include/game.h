@@ -5,12 +5,12 @@
 #include "board.h"
 #include <semaphore.h>
 
-typedef struct {
+typedef struct client{
     char req_pipe_path[40];
     char notif_pipe_path[40];
     int id; //id cliente
     int slot; //index no array de active players
-    client_request_t* next;
+    struct client* next;
 } client_request_t;
 
 typedef struct {
