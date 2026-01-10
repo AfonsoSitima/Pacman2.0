@@ -17,7 +17,6 @@ int write_all(int fd, char *buf, size_t len) {
   while (written < len) {
     ssize_t ret = write(fd, p + written, len - written);
     if (ret < 0) {
-      //if (errno == EINTR) continue;
       return -1;
     }
     written += (size_t)ret;
@@ -32,7 +31,6 @@ int read_all(int fd, char *buf, size_t len) {
     ssize_t ret = read(fd, p + got, len - got);
     if (ret == 0) return -1;              // EOF before full message
     if (ret < 0) {
-      //if (errno == EINTR) continue;
       return -1;
     }
     got += (size_t)ret;

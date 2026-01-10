@@ -28,9 +28,8 @@
 #define PACMAN 1
 #define GHOST 2
 
-volatile sig_atomic_t SIGUSR1_received = 0; //variável global para o estado do signal 
-//volatile sig_atomic_t   _received = 0;
-
+volatile sig_atomic_t SIGUSR1_received = 0;  
+extern volatile sig_atomic_t shutdown = 0;
 
 //pthread_t serverId;
 
@@ -79,26 +78,6 @@ int play_board(board_t * game_board, session_t* game_s) {
         free(play);
         return QUIT_GAME;
     }
-
-    /*if (pacman->n_moves == 0) { // if is user input
-        pthread_mutex_lock(&game_board->ncurses_lock);
-        c.command = get_input();
-        pthread_mutex_unlock(&game_board->ncurses_lock);
-
-        if(c.command == '\0') {
-            debug("NO INPUT\n");
-            return CONTINUE_PLAY;
-        }
-        c.turns = 1;
-        play = &c;
-    }
-    else { // else if the moves are pre-defined in the file
-        // avoid buffer overflow wrapping around with modulo of n_moves
-        // this ensures that we always access a valid move for the pacman
-        play = &pacman->moves[pacman->current_move%pacman->n_moves];
-    }*/
-
-    //não sei como é que funciona a cena de turns com a implementação com servers
 
     play->command = get_pacman_command(game_s);
     debug("Received command: %c\n", play->command);
@@ -158,7 +137,7 @@ void* ghost_thread(void* thread_data) {
     int ghost_index = data->index; 
     ghost_t* ghost = &board->ghosts[ghost_index];
     int active = 1;
-    while(1) {
+    while(!shutdown) {
         sleep_ms(board->tempo);
         move_ghost(board, ghost_index, &ghost->moves[ghost->current_move % ghost->n_moves]);
         pthread_rwlock_rdlock(&board->board_lock);
@@ -199,6 +178,7 @@ void* pacman_thread(void* arg) {
     session_t* game_s = data->game_s;
     while (1) {
         //sleep_ms(board->tempo); 
+        if(shutdown) break;
         int play = play_board(board, game_s);
         if (play == CONTINUE_PLAY)
             continue;
@@ -261,6 +241,7 @@ void* server_thread(void* arg){
     int victory;
     //atualiza periodicamente
     while(1){
+        if(shutdown) break;
         sleep_ms(board->tempo);
         char buf[(sizeof(int) * 6) + 1];
         memset(buf, '\0', sizeof(buf));
@@ -337,9 +318,9 @@ void* game_thread(void* arg) {
     
     char req_file_path[40];
     char notif_file_path[40];
-    while(1){
+    while(!shutdown){
         sem_wait(sem_games); //espera por um novo jogo para iniciar
-
+        if(shutdown) break;
         pthread_mutex_lock(&producerConsumer->lock);     //ler dados do produtor consumidor
         client_request_t request = pop_p2c(producerConsumer);
         strncpy(req_file_path, request.req_pipe_path, 40);
@@ -372,6 +353,7 @@ void* game_thread(void* arg) {
         //pthread_create(&serverId, NULL);
         
         while (!end_game) {
+            if(shutdown) break;
             pthread_mutex_lock(lock);
             game_board = level_copy(levels[indexLevel]);
             pthread_mutex_unlock(lock);
@@ -427,7 +409,7 @@ void* game_thread(void* arg) {
 
        
 
-void start_game_threads(/*char * server_pipe_path,*/ int max_games, pthread_t* gameTids, board_t** levels, p2c_t* producerConsumer, sem_t* sem_games, sem_t* sem_slots, session_t** activeClients, pthread_mutex_t* clientsArrayLock) {
+void start_game_threads( int max_games, pthread_t* gameTids, board_t** levels, p2c_t* producerConsumer, sem_t* sem_games, sem_t* sem_slots, session_t** activeClients, pthread_mutex_t* clientsArrayLock) {
     for (int i = 0; i < max_games; i++) {
 
         thread_game_t* thread_data = malloc(sizeof(thread_game_t));
@@ -528,6 +510,7 @@ void* host_thread(void* arg) {
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
+    sigaddset(&set, SIGINT);
     pthread_sigmask(SIG_UNBLOCK, &set, NULL);
 
     thread_host_t* data = (thread_host_t*)arg;
@@ -547,14 +530,15 @@ void* host_thread(void* arg) {
     servfd = open(server_pipe_path, O_RDWR);  //MUDEI PARA RDWR PARA NÃO BLOQUEAR
     if (servfd < 0) return NULL;
 
-    while(1) {  
+    while(!shutdown) {  
         if(SIGUSR1_received){
             leaderBoard(activeClients, maxGames, lock);
             SIGUSR1_received = 0; //reseta
-            
         }
-
-        if(read_all(servfd, buf, sizeof(buf)) < 0 ) continue;
+        if(read_all(servfd, buf, sizeof(buf)) < 0 ) {
+            if(shutdown) break;
+            continue;
+        }
         if(buf[0] != OP_CODE_CONNECT) continue; //error
 
         client_request_t request;
@@ -604,7 +588,9 @@ void start_host(p2c_t* p2c, sem_t* sem_games, sem_t* sem_slots, char* server_pip
 void handle_SIGUSR1(){
     SIGUSR1_received = 1;
 }
-
+void handle_shutdown(){
+    shutdown = 1;
+}
 int main(int argc, char** argv) {
     sigset_t set;
     sigemptyset(&set);
@@ -619,6 +605,11 @@ int main(int argc, char** argv) {
     }
 
     signal(SIGPIPE, SIG_IGN); //caso o cliente feche a ligação, não dá erro quando tentamos escrever para lá 
+    struct sigaction sa;
+    sa.sa_handler = handle_shutdown;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0; // Ajuda a que o read() não morra com erro
+    sigaction(SIGINT, &sa, NULL); 
     
     struct sigaction sa2;
     sa2.sa_handler = handle_SIGUSR1;
@@ -662,11 +653,18 @@ int main(int argc, char** argv) {
 
     start_game_threads(maxGames, gameTids, levels, p2c, sem_games, sem_slots, activeClients, &clients_lock);
     
-
     pthread_join(hostId, NULL);
+    if(shutdown){
+        for(int i = 0; i < maxGames; i++){
+            sem_post(sem_games);
+        }
+    }
+
     for(int i = 0 ; i < maxGames; i++){
         pthread_join(gameTids[i], NULL);
     }
+    
+    
     free(gameTids);//organizar melhor isto
     unload_allLevels(levels);
 
