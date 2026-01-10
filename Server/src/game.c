@@ -106,7 +106,7 @@ int play_board(board_t * game_board, session_t* game_s) {
 
 
 
-    if (play->command == 'Q' || play->command == -1) {
+    if (play->command == 'Q' || play->command == -1 || shutdown) {
         pthread_rwlock_wrlock(&pacman->lock);
         pacman->alive = 0;
         pthread_rwlock_unlock(&pacman->lock);
@@ -195,10 +195,10 @@ void* pacman_thread(void* arg) {
     session_t* game_s = data->game_s;
     while (1) {
         //sleep_ms(board->tempo); 
-        if(shutdown){
+        /*if(shutdown){
             board->result = QUIT_GAME;
             break;
-        }
+        }*/
         int play = play_board(board, game_s);
         if (play == CONTINUE_PLAY)
             continue;
@@ -338,11 +338,15 @@ void* game_thread(void* arg) {  //1 2 3 4 5
     
     char req_file_path[40];
     char notif_file_path[40];
-    while(!shutdown){
+    while(1){
         sem_wait(sem_games); //espera por um novo jogo para iniciar
         if(shutdown) break;
         pthread_mutex_lock(&producerConsumer->lock);     //ler dados do produtor consumidor
         client_request_t* request = pop_p2c(producerConsumer);
+        if (!request) {
+            pthread_mutex_unlock(&producerConsumer->lock);
+            break; // No request to process
+        }
         strncpy(req_file_path, request->req_pipe_path, 40);
         strncpy(notif_file_path, request->notif_pipe_path, 40);
         int id = request->id;
@@ -350,6 +354,14 @@ void* game_thread(void* arg) {  //1 2 3 4 5
         free(request);
 
         pthread_mutex_unlock(&producerConsumer->lock);
+
+        if (shutdown) {
+            char msg[2];
+            msg[0] = OP_CODE_CONNECT;
+            msg[1] = -1; //server is shutting down
+            write_all(notif_file_path, msg, 2);
+            continue;
+        }
 
         session_t *game_s = malloc(sizeof(session_t));
         strncpy(game_s->req_pipe_path, req_file_path, 40);

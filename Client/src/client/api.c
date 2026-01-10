@@ -97,6 +97,12 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
     session.notif_pipe = -1;
     return 1;
   }
+  if (resp[1] != -1) {
+    // Connection rejected by server
+    close(session.notif_pipe);
+    session.notif_pipe = -1;
+    return 1;
+  }
   // Only after confirmation, open request FIFO for writing
   session.req_pipe = open(req_pipe_path, O_WRONLY);
   if (session.req_pipe < 0) {
