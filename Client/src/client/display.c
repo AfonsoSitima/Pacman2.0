@@ -49,7 +49,8 @@ int terminal_init() {
 
 void draw_board_client(Board board) {
     // Clear the screen before redrawing
-    clear();
+    erase();
+    //clear();
 
     // Draw the border/title
     attron(COLOR_PAIR(5));
