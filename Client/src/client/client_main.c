@@ -210,7 +210,7 @@ int main(int argc, char *argv[]) {
     pthread_join(receiver_thread_id, NULL);
 
     debug("Disconnecting from server...\n");
-
+    
     pacman_disconnect();
   
     

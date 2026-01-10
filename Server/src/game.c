@@ -30,6 +30,7 @@
 
 volatile sig_atomic_t SIGUSR1_received = 0;  
 volatile sig_atomic_t shutdown = 0;
+static int servfd = -1;
 
 //pthread_t serverId;
 
@@ -194,7 +195,10 @@ void* pacman_thread(void* arg) {
     session_t* game_s = data->game_s;
     while (1) {
         //sleep_ms(board->tempo); 
-        if(shutdown) break;
+        if(shutdown){
+            board->result = QUIT_GAME;
+            break;
+        }
         int play = play_board(board, game_s);
         if (play == CONTINUE_PLAY)
             continue;
@@ -370,7 +374,6 @@ void* game_thread(void* arg) {  //1 2 3 4 5
         //pthread_create(&serverId, NULL);
         
         while (!end_game) {
-            if(shutdown) break;
             pthread_mutex_lock(lock);
             game_board = level_copy(levels[indexLevel]);
             pthread_mutex_unlock(lock);
@@ -418,7 +421,6 @@ void* game_thread(void* arg) {  //1 2 3 4 5
         activeClients[slot] = NULL; // remove client dos ativos
         pthread_mutex_unlock(lock);
     }
-    pthread_mutex_destroy(lock);
     free(data);
     return NULL;
 }
@@ -515,7 +517,7 @@ void* host_thread(void* arg) {
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
-    //sigaddset(&set, SIGINT);
+    sigaddset(&set, SIGINT);
     pthread_sigmask(SIG_UNBLOCK, &set, NULL);
 
     thread_host_t* data = (thread_host_t*)arg;
@@ -527,7 +529,6 @@ void* host_thread(void* arg) {
     int maxGames = data->maxGames;
     char buf[1 + 40 + 40]; //1 para o id, 40 para o req pipe path, 40 para o notif pipe path
 
-    int servfd;
 
     if (unlink(server_pipe_path) != 0 && errno != ENOENT) return NULL;
     if (mkfifo(server_pipe_path, 0640) != 0) return NULL; //cria o pipe do servidor
@@ -564,7 +565,6 @@ void* host_thread(void* arg) {
         sem_post(sem_games); //sinaliza que há um novo jogo para iniciar
 
     }
-    free(activeClients);
     free(data);
     return NULL;
 }
@@ -587,11 +587,17 @@ void handle_SIGUSR1(){
 }
 void handle_shutdown(){
     shutdown = 1;
+    if(servfd != -1){
+        close(servfd);
+        servfd = -1;
+    }
 }
+
 int main(int argc, char** argv) {
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
+    sigaddset(&set, SIGINT);
     pthread_sigmask(SIG_BLOCK, &set, NULL);
 
     if (argc != 3 && argc != 4) {
@@ -654,6 +660,7 @@ int main(int argc, char** argv) {
 
     
     pthread_join(hostId, NULL);
+
     if(shutdown){
         for(int i = 0; i < maxGames; i++){
             sem_post(sem_games);
