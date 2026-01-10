@@ -58,7 +58,7 @@ static void *receiver_thread(void *arg) {
             pthread_mutex_lock(&ready_lock);
             board_ready = true;
             pthread_mutex_unlock(&ready_lock);
-            pthread_cond_broadcast(&cond);  // acorda o main
+            pthread_cond_broadcast(&cond);  // wake up main thread
         }
         pthread_rwlock_unlock(&temp_lock);
         
@@ -132,15 +132,9 @@ int main(int argc, char *argv[]) {
     }
 
     terminal_init();
-    //set_timeout(500);
 
     pthread_t receiver_thread_id;
     pthread_create(&receiver_thread_id, NULL, receiver_thread, NULL);
-
-    //pthread_mutex_lock(&ncurses);
-    //draw_board_client(board);
-    //refresh_screen();
-    //pthread_mutex_unlock(&ncurses);
 
     pthread_mutex_lock(&ready_lock);
     while (!board_ready) pthread_cond_wait(&cond, &ready_lock);

@@ -29,9 +29,6 @@ int write_all(int fd, char *buf, size_t len) {
   while (written < len) {
     ssize_t ret = write(fd, p + written, len - written);
     if (ret < 0) {
-/*       //if (errno == EINTR){
-        continue;
-      }; */
       return -1;
     }
     written += (size_t)ret;
@@ -44,9 +41,8 @@ int read_all(int fd, char *buf, size_t len) {
   size_t got = 0;
   while (got < len) {
     ssize_t ret = read(fd, p + got, len - got);
-    if (ret == 0) return -1;              // EOF before full message
+    if (ret == 0) return -1;           
     if (ret < 0) {
-      //if (errno == EINTR) continue;
       return -1;
     }
     got += (size_t)ret;
@@ -55,21 +51,17 @@ int read_all(int fd, char *buf, size_t len) {
 }
 
 int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char const *server_pipe_path) {
-  // Remove any existing client FIFOs
   if (unlink(req_pipe_path) != 0 && errno != ENOENT) return 1;
   if (unlink(notif_pipe_path) != 0 && errno != ENOENT) return 1;
 
-  // Create client FIFOs
-  if (mkfifo(req_pipe_path, 0640) != 0) return 1;    //Não sei o que meter no segundo argumento
+  if (mkfifo(req_pipe_path, 0640) != 0) return 1;   
   if (mkfifo(notif_pipe_path, 0640) != 0) return 1;
 
-  // Open server FIFO for writing and send CONNECT request
   int servfd = open(server_pipe_path, O_WRONLY);
   if (servfd < 0) return 1;
 
-  // Message format: (char)OP_CODE=1 | (char[40]) req_pipe | (char[40]) notif_pipe
   char msg[1 + 40 + 40];
-  memset(msg, '\0', sizeof(msg));
+  memset(msg, 0, sizeof(msg));
   msg[0] = OP_CODE_CONNECT;
   memcpy(msg + 1, req_pipe_path, 40);
   memcpy(msg + 1 + 40, notif_pipe_path, 40);
@@ -78,13 +70,11 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
     return 1;
   }
   close(servfd);
-  debug("AAAAAAAA------%s\n", msg);
 
-  // Open notification FIFO for reading (blocks until server opens it for writing)
+
   session.notif_pipe = open(notif_pipe_path, O_RDONLY);
   if (session.notif_pipe < 0) return 1;
 
-  // Wait for confirmation: (char)OP_CODE=1 | (char)result
   char resp[2];
   if (read_all(session.notif_pipe, resp, sizeof(resp)) != 0) {
     close(session.notif_pipe);
@@ -92,18 +82,15 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
     return 1;
   }
   if (resp[0] != OP_CODE_CONNECT) {
-    // Unexpected response
     close(session.notif_pipe);
     session.notif_pipe = -1;
     return 1;
   }
   if (resp[1] == -1) {
-    // Connection rejected by server
     close(session.notif_pipe);
     session.notif_pipe = -1;
     return 1;
   }
-  // Only after confirmation, open request FIFO for writing
   session.req_pipe = open(req_pipe_path, O_WRONLY);
   if (session.req_pipe < 0) {
     debug("Entrou\n");
@@ -112,14 +99,12 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
     return 1;
   }
 
-  // Save paths (optional but useful)
   strncpy(session.req_pipe_path, req_pipe_path, MAX_PIPE_PATH_LENGTH);
   session.req_pipe_path[MAX_PIPE_PATH_LENGTH] = '\0';
   strncpy(session.notif_pipe_path, notif_pipe_path, MAX_PIPE_PATH_LENGTH);
   session.notif_pipe_path[MAX_PIPE_PATH_LENGTH] = '\0';
 
   
-  // Return 0 on success, 1 on error (server decides result)
   return (resp[1] == 0) ? 0 : 1;
 }
 
@@ -128,8 +113,6 @@ int pacman_play(char command) {
   buf[0] = OP_CODE_PLAY;
   buf[1] = command;
   if(write_all(session.req_pipe, buf, 2) < 0) {
-    //error
-    //return -1
     return -1;
   }
   return 0;
@@ -158,13 +141,9 @@ Board receive_board_update(void) {
   char buf[1 + (sizeof(int) * 6)];
   memset(buf, '\0', sizeof(buf));
 
-    //verificar se o opcode está certo
-
-  
   if (read_all(session.notif_pipe, buf, 1 + (sizeof(int) * 6)) != 0) {
-    //error
     board.data = NULL;
-    return board; //se for null podemos tratar erro
+    return board;
   }
     memcpy(&width, buf + 1, sizeof(int));
     memcpy(&height, buf + 1 + sizeof(int),    sizeof(int));
@@ -191,7 +170,5 @@ Board receive_board_update(void) {
   board.game_over = game_over;
   board.accumulated_points = accumulated_points;
   
-  //debug("W : %d, H : %d, Tempo : %d, Vic: %d, Over: %d, Acc : %d\n", width, height, tempo, victory, game_over, accumulated_points);
-  //debug("%s\n", board.data);
   return board;
 }
