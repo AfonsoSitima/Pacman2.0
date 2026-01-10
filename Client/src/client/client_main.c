@@ -22,7 +22,7 @@ pthread_mutex_t ready_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_rwlock_t execution = PTHREAD_RWLOCK_INITIALIZER;
 
 volatile sig_atomic_t SIGINT_received = 0; 
-int svOn = 1;
+
 
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t ncurses = PTHREAD_MUTEX_INITIALIZER;
@@ -201,10 +201,8 @@ int main(int argc, char *argv[]) {
             pacman_play('Q');
         }
         else{
-            if(pacman_play(command) < 0){
-                svOn = 0;
-                break;
-            }
+            pacman_play(command);
+         
         }
     }
 
@@ -214,9 +212,8 @@ int main(int argc, char *argv[]) {
 
     debug("Disconnecting from server...\n");
 
-    if(svOn){
-        pacman_disconnect();
-    }
+    pacman_disconnect();
+  
     
     debug("DESCONECTOU\n");
     sleep_ms(1000);

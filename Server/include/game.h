@@ -6,6 +6,7 @@
 #include <semaphore.h>
 #include <signal.h>
 
+
 typedef struct client{
     char req_pipe_path[40];
     char notif_pipe_path[40];

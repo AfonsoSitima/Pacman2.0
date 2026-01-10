@@ -30,7 +30,7 @@
 
 volatile sig_atomic_t SIGUSR1_received = 0;  
 volatile sig_atomic_t shutdown = 0;
-
+int game_shutdown = 0;
 //pthread_t serverId;
 
 //maybe fazer esta parte noutro ficheiro
@@ -145,7 +145,7 @@ void* ghost_thread(void* thread_data) {
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
-    sigaddset(&set, SIGINT);
+    //sigaddset(&set, SIGINT);
     pthread_sigmask(SIG_BLOCK, &set, NULL);    
 
  
@@ -189,7 +189,7 @@ void* pacman_thread(void* arg) {
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
-    sigaddset(&set, SIGINT);
+    //sigaddset(&set, SIGINT);
     pthread_sigmask(SIG_BLOCK, &set, NULL);
 
     thread_pacman_t* data = arg;
@@ -197,6 +197,11 @@ void* pacman_thread(void* arg) {
     session_t* game_s = data->game_s;
     while (1) {
         //sleep_ms(board->tempo); 
+        if(game_shutdown){
+            board->result = QUIT_GAME;
+            free(data);
+            return NULL;
+        }
         int play = play_board(board, game_s);
         if (play == CONTINUE_PLAY)
             continue;
@@ -246,7 +251,7 @@ void* server_thread(void* arg){
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
-    sigaddset(&set, SIGINT);
+    //sigaddset(&set, SIGINT);
     pthread_sigmask(SIG_BLOCK, &set, NULL);
 
 
@@ -325,10 +330,6 @@ void* game_thread(void* arg) {  //1 2 3 4 5
     sigaddset(&set, SIGUSR1);
     pthread_sigmask(SIG_BLOCK, &set, NULL);
     
-    sigset_t set2;
-    sigemptyset(&set2);
-    sigaddset(&set2, SIGINT);
-    pthread_sigmask(SIG_UNBLOCK, &set2, NULL);
     
     
     thread_game_t* data = (thread_game_t*)arg;
@@ -342,12 +343,11 @@ void* game_thread(void* arg) {  //1 2 3 4 5
     
     char req_file_path[40];
     char notif_file_path[40];
-    while(!shutdown){
+    while(!game_shutdown){
         sem_wait(sem_games); //espera por um novo jogo para iniciar
         pthread_mutex_lock(&producerConsumer->lock);     //ler dados do produtor consumidor
         client_request_t* request = pop_p2c(producerConsumer);
 
-        if(!request) continue;
 
         strncpy(req_file_path, request->req_pipe_path, 40);
         strncpy(notif_file_path, request->notif_pipe_path, 40);
@@ -399,9 +399,6 @@ void* game_thread(void* arg) {  //1 2 3 4 5
             pthread_join(game_board->pacTid, NULL); //waits for pacman thread to end
             
             int result = game_board->result; //get result of the game
-            if(shutdown){
-                result = QUIT_GAME;
-            }
             
             pthread_rwlock_wrlock(&game_board->board_lock);
             game_board->active = 0;   //stop other threads
@@ -430,7 +427,7 @@ void* game_thread(void* arg) {  //1 2 3 4 5
         activeClients[slot] = NULL; // remove client dos ativos
         pthread_mutex_unlock(lock);
     }
-    pthread_mutex_destroy(lock);
+    //pthread_mutex_destroy(lock);
     free(data);
     return NULL;
 }
@@ -537,7 +534,7 @@ void* host_thread(void* arg) {
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
-    //sigaddset(&set, SIGINT);
+    sigaddset(&set, SIGINT);
     pthread_sigmask(SIG_UNBLOCK, &set, NULL);
 
     thread_host_t* data = (thread_host_t*)arg;
@@ -561,8 +558,12 @@ void* host_thread(void* arg) {
             leaderBoard(activeClients, maxGames, lock);
             SIGUSR1_received = 0; //reseta
         }
+        if(shutdown){
+            game_shutdown = 1;
+            break;
+        }
         if(read_all(servfd, buf, sizeof(buf)) < 0 ) {
-            //erro
+            
         }
         if(buf[0] != OP_CODE_CONNECT) continue; //error
 
