@@ -126,7 +126,6 @@ int main(int argc, char *argv[]) {
     open_debug_file("client-debug.log");
     debug("%s\n", req_pipe_path);
     debug("%s\n", notif_pipe_path);
-    debug("%s\n", sv_pipe);
     if (pacman_connect(req_pipe_path, notif_pipe_path, sv_pipe) != 0) {
         perror("Failed to connect to server");
         return 1;
