@@ -3,6 +3,7 @@ CC = gcc
 CFLAGS = -g -Wall -Wextra -std=c17 -D_POSIX_C_SOURCE=200809L
 LDFLAGS = -lncurses 
 
+
 # Directory variables
 OBJ_DIR = obj
 BIN_DIR = bin

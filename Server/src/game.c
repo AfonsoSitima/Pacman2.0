@@ -17,7 +17,7 @@
 #include <sys/stat.h>
 #include <semaphore.h>
 #include <signal.h>
-
+#include <stdatomic.h>
 
 #define CONTINUE_PLAY 0
 #define NEXT_LEVEL 1
@@ -29,7 +29,7 @@
 #define GHOST 2
 
 volatile sig_atomic_t SIGUSR1_received = 0;  
-volatile sig_atomic_t shutdown = 0;
+atomic_int shutdown = 0;
 static int servfd = -1;
 
 //pthread_t serverId;
