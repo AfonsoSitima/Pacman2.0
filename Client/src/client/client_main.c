@@ -22,6 +22,7 @@ pthread_mutex_t ready_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_rwlock_t execution = PTHREAD_RWLOCK_INITIALIZER;
 
 volatile sig_atomic_t SIGINT_received = 0; 
+int svOn = 1;
 
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t ncurses = PTHREAD_MUTEX_INITIALIZER;
@@ -88,6 +89,8 @@ int main(int argc, char *argv[]) {
     sigemptyset(&sa2.sa_mask);
     sa2.sa_flags = 0; 
     sigaction(SIGINT, &sa2, NULL); 
+    signal(SIGPIPE, SIG_IGN);
+
     if (argc != 3 && argc != 4) {
         fprintf(stderr,
             "Usage: %s <client_id> <register_pipe> [commands_file]\n",
@@ -195,10 +198,13 @@ int main(int argc, char *argv[]) {
 
         debug("Command: %c\n", command);
         if(SIGINT_received){
-            pacman_play(-1);
+            pacman_play('Q');
         }
         else{
-            pacman_play(command);
+            if(pacman_play(command) < 0){
+                svOn = 0;
+                break;
+            }
         }
     }
 
@@ -208,7 +214,10 @@ int main(int argc, char *argv[]) {
 
     debug("Disconnecting from server...\n");
 
-    pacman_disconnect();
+    if(svOn){
+        pacman_disconnect();
+    }
+    
     debug("DESCONECTOU\n");
     sleep_ms(1000);
     debug("Exiting main...\n");

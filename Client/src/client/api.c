@@ -29,7 +29,9 @@ int write_all(int fd, char *buf, size_t len) {
   while (written < len) {
     ssize_t ret = write(fd, p + written, len - written);
     if (ret < 0) {
-      //if (errno == EINTR) continue;
+      if (errno == EINTR){
+        continue;
+      };
       return -1;
     }
     written += (size_t)ret;
@@ -44,7 +46,7 @@ int read_all(int fd, char *buf, size_t len) {
     ssize_t ret = read(fd, p + got, len - got);
     if (ret == 0) return -1;              // EOF before full message
     if (ret < 0) {
-      //if (errno == EINTR) continue;
+      if (errno == EINTR) continue;
       return -1;
     }
     got += (size_t)ret;
@@ -132,7 +134,9 @@ int pacman_play(char command) {
 int pacman_disconnect() {
   char buf[1];
   buf[0] = OP_CODE_DISCONNECT;
-  write_all(session.req_pipe, buf, 1);
+  if(write_all(session.req_pipe, buf, 1) < 0 ){
+    return -1;
+  }
 
   close(session.req_pipe);
   close(session.notif_pipe);
@@ -170,7 +174,8 @@ Board receive_board_update(void) {
   board.data = malloc((width * height) * sizeof(char));
 
   if (read_all(session.notif_pipe, board.data, height * width) != 0) {
-    //error
+    board.data = NULL;
+    return board;
   }
 
   board.width = width;

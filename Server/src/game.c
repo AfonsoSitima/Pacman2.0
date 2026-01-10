@@ -96,6 +96,7 @@ int play_board(board_t * game_board, session_t* game_s) {
     }
 
     play->command = get_pacman_command(game_s);
+
     debug("Received command: %c\n", play->command);
     play->turns = 1;
     play->turns_left = 0;
@@ -144,6 +145,7 @@ void* ghost_thread(void* thread_data) {
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
+    sigaddset(&set, SIGINT);
     pthread_sigmask(SIG_BLOCK, &set, NULL);    
 
  
@@ -153,7 +155,7 @@ void* ghost_thread(void* thread_data) {
     int ghost_index = data->index; 
     ghost_t* ghost = &board->ghosts[ghost_index];
     int active = 1;
-    while(!shutdown) {
+    while(1) {
         sleep_ms(board->tempo);
         move_ghost(board, ghost_index, &ghost->moves[ghost->current_move % ghost->n_moves]);
         pthread_rwlock_rdlock(&board->board_lock);
@@ -187,6 +189,7 @@ void* pacman_thread(void* arg) {
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
+    sigaddset(&set, SIGINT);
     pthread_sigmask(SIG_BLOCK, &set, NULL);
 
     thread_pacman_t* data = arg;
@@ -194,7 +197,6 @@ void* pacman_thread(void* arg) {
     session_t* game_s = data->game_s;
     while (1) {
         //sleep_ms(board->tempo); 
-        if(shutdown) break;
         int play = play_board(board, game_s);
         if (play == CONTINUE_PLAY)
             continue;
@@ -244,6 +246,7 @@ void* server_thread(void* arg){
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
+    sigaddset(&set, SIGINT);
     pthread_sigmask(SIG_BLOCK, &set, NULL);
 
 
@@ -257,7 +260,6 @@ void* server_thread(void* arg){
     int victory;
     //atualiza periodicamente
     while(1){
-        if(shutdown) break;
         sleep_ms(board->tempo);
         char buf[(sizeof(int) * 6) + 1];
         memset(buf, '\0', sizeof(buf));
@@ -323,6 +325,12 @@ void* game_thread(void* arg) {  //1 2 3 4 5
     sigaddset(&set, SIGUSR1);
     pthread_sigmask(SIG_BLOCK, &set, NULL);
     
+    sigset_t set2;
+    sigemptyset(&set2);
+    sigaddset(&set2, SIGINT);
+    pthread_sigmask(SIG_UNBLOCK, &set2, NULL);
+    
+    
     thread_game_t* data = (thread_game_t*)arg;
     //session_t* game_s = data->game_s;
     p2c_t* producerConsumer = data->producerConsumer;
@@ -336,9 +344,11 @@ void* game_thread(void* arg) {  //1 2 3 4 5
     char notif_file_path[40];
     while(!shutdown){
         sem_wait(sem_games); //espera por um novo jogo para iniciar
-        if(shutdown) break;
         pthread_mutex_lock(&producerConsumer->lock);     //ler dados do produtor consumidor
         client_request_t* request = pop_p2c(producerConsumer);
+
+        if(!request) continue;
+
         strncpy(req_file_path, request->req_pipe_path, 40);
         strncpy(notif_file_path, request->notif_pipe_path, 40);
         int id = request->id;
@@ -370,7 +380,6 @@ void* game_thread(void* arg) {  //1 2 3 4 5
         //pthread_create(&serverId, NULL);
         
         while (!end_game) {
-            if(shutdown) break;
             pthread_mutex_lock(lock);
             game_board = level_copy(levels[indexLevel]);
             pthread_mutex_unlock(lock);
@@ -390,6 +399,9 @@ void* game_thread(void* arg) {  //1 2 3 4 5
             pthread_join(game_board->pacTid, NULL); //waits for pacman thread to end
             
             int result = game_board->result; //get result of the game
+            if(shutdown){
+                result = QUIT_GAME;
+            }
             
             pthread_rwlock_wrlock(&game_board->board_lock);
             game_board->active = 0;   //stop other threads
@@ -525,7 +537,7 @@ void* host_thread(void* arg) {
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
-    sigaddset(&set, SIGINT);
+    //sigaddset(&set, SIGINT);
     pthread_sigmask(SIG_UNBLOCK, &set, NULL);
 
     thread_host_t* data = (thread_host_t*)arg;
@@ -544,14 +556,13 @@ void* host_thread(void* arg) {
     servfd = open(server_pipe_path, O_RDWR);  //MUDEI PARA RDWR PARA NÃO BLOQUEAR
     if (servfd < 0) return NULL;
 
-    while(!shutdown) {  
+    while(1) { 
         if(SIGUSR1_received){
             leaderBoard(activeClients, maxGames, lock);
             SIGUSR1_received = 0; //reseta
         }
         if(read_all(servfd, buf, sizeof(buf)) < 0 ) {
-            if(shutdown) break;
-            continue;
+            //erro
         }
         if(buf[0] != OP_CODE_CONNECT) continue; //error
 
@@ -574,6 +585,7 @@ void* host_thread(void* arg) {
         sem_post(sem_games); //sinaliza que há um novo jogo para iniciar
 
     }
+    //close(servfd);
     free(activeClients);
     free(data);
     return NULL;
@@ -602,6 +614,7 @@ int main(int argc, char** argv) {
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
+    sigaddset(&set, SIGINT);
     pthread_sigmask(SIG_BLOCK, &set, NULL);
 
     if (argc != 3 && argc != 4) {
@@ -662,17 +675,17 @@ int main(int argc, char** argv) {
 
     start_game_threads(maxGames, gameTids, levels, p2c, sem_games, activeClients, &clients_lock);
 
-    
-    pthread_join(hostId, NULL);
-    if(shutdown){
-        for(int i = 0; i < maxGames; i++){
-            sem_post(sem_games);
-        }
-    }
 
     for(int i = 0 ; i < maxGames; i++){
         pthread_join(gameTids[i], NULL);
     }
+
+    pthread_join(hostId, NULL);
+
+    /*     for (int i = 0; i < maxGames; i++) {
+         sem_post(sem_games); 
+    }
+     */  
     
     
     free(gameTids);//organizar melhor isto

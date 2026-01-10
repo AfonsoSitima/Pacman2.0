@@ -4,6 +4,7 @@
 #include "api2.h"
 #include "board.h"
 #include <semaphore.h>
+#include <signal.h>
 
 typedef struct client{
     char req_pipe_path[40];
