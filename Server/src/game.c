@@ -32,18 +32,14 @@ volatile sig_atomic_t SIGUSR1_received = 0;
 atomic_int shutdown = 0;
 static int servfd = -1;
 
-//pthread_t serverId;
 
-//maybe fazer esta parte noutro ficheiro
 void innit_p2c(p2c_t* p2c, int max_games) {
-    //p2c->client_request = malloc(max_games * sizeof(client_request_t));
     p2c->head = NULL;
     p2c->tail = NULL;
     p2c->max_size = max_games;
 }
 
 void destroy_p2c(p2c_t* p2c) {
-    //free(p2c->client_request);
     for (client_request_t* curr = p2c->head; curr != NULL; ) {
         client_request_t* next = curr->next;
         free(curr);
@@ -194,11 +190,6 @@ void* pacman_thread(void* arg) {
     board_t* board = data->board;
     session_t* game_s = data->game_s;
     while (1) {
-        //sleep_ms(board->tempo); 
-        /*if(shutdown){
-            board->result = QUIT_GAME;
-            break;
-        }*/
         int play = play_board(board, game_s);
         if (play == CONTINUE_PLAY)
             continue;
@@ -259,7 +250,6 @@ void* server_thread(void* arg){
     int game_over;
     int accumulated_points;
     int victory;
-    //atualiza periodicamente
     while(1){
         if(shutdown) break;
         sleep_ms(board->tempo);
@@ -269,7 +259,7 @@ void* server_thread(void* arg){
         pthread_rwlock_rdlock(&pacman->lock);
         game_over = !pacman->alive;
         accumulated_points = pacman->points;
-        game_s->points = pacman->points; //points da seesão 
+        game_s->points = pacman->points; //points da session 
         victory = pacman->won;
         pthread_rwlock_unlock(&pacman->lock);
 
@@ -285,20 +275,13 @@ void* server_thread(void* arg){
             break;
         } 
         
-
-        //Função para meter tabuleiro em char
-        
         char* boardChar = boardToChar(board);
-        //debug("%s\n", buf);
+        
         
         if(write_all(game_s->notif_pipe, boardChar, board->height * board->width) < 0){
             break;
         }
    
-        
-        
-        //pthread_rwlock_unlock(&board->board_lock);
-        //debug("%s\n", boardChar);
         free(boardChar);
 
         pthread_rwlock_rdlock(&board->board_lock);
@@ -321,14 +304,13 @@ void start_server_thread(board_t* board, session_t* game_s, pthread_t* serverId)
 
 
 
-void* game_thread(void* arg) {  //1 2 3 4 5
+void* game_thread(void* arg) { 
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
     pthread_sigmask(SIG_BLOCK, &set, NULL);
     
     thread_game_t* data = (thread_game_t*)arg;
-    //session_t* game_s = data->game_s;
     p2c_t* producerConsumer = data->producerConsumer;
     board_t** levels = data->levels;
     sem_t* sem_games = data->sem_games;
@@ -340,17 +322,16 @@ void* game_thread(void* arg) {  //1 2 3 4 5
     char notif_file_path[40];
     while(1){
         sem_wait(sem_games); //espera por um novo jogo para iniciar
-        //if(shutdown) break;
-        pthread_mutex_lock(&producerConsumer->lock);     //ler dados do produtor consumidor
+        pthread_mutex_lock(&producerConsumer->lock);     //ler dados
         client_request_t* request = pop_p2c(producerConsumer);
         if (!request ) {
             pthread_mutex_unlock(&producerConsumer->lock);
-            break; // No request to process
+            break; 
         }
         strncpy(req_file_path, request->req_pipe_path, 40);
         strncpy(notif_file_path, request->notif_pipe_path, 40);
         int id = request->id;
-        //int slot = request->slot;
+
         free(request);
 
         pthread_mutex_unlock(&producerConsumer->lock);
@@ -358,7 +339,7 @@ void* game_thread(void* arg) {  //1 2 3 4 5
         if (shutdown == 1) {
             char msg[2];
             msg[0] = OP_CODE_CONNECT;
-            msg[1] = -1; //server is shutting down
+            msg[1] = -1; //shutdown
             int fd = open(notif_file_path, O_WRONLY);
             write_all(fd, msg, 2);
             close(fd);
@@ -370,7 +351,7 @@ void* game_thread(void* arg) {  //1 2 3 4 5
         strncpy(game_s->notif_pipe_path, notif_file_path, 40);
 
         game_s->slot = slot;
-        innit_session(game_s, id); //inicia sessão sem guardar o número de sessões
+        innit_session(game_s, id); 
 
         //adicionar novo client
         pthread_mutex_lock(lock);
@@ -385,7 +366,6 @@ void* game_thread(void* arg) {  //1 2 3 4 5
         bool end_game = false;
         
         pthread_t serverId;
-        //pthread_create(&serverId, NULL);
         
         while (!end_game) {
             pthread_mutex_lock(lock);
@@ -401,7 +381,6 @@ void* game_thread(void* arg) {  //1 2 3 4 5
             
             start_server_thread(game_board, game_s, &serverId);
             start_pacman_thread(game_board, game_s);
-            //start_server_thread(game_board, game_s);
             start_ghost_threads(game_board);
             
             pthread_join(game_board->pacTid, NULL); //waits for pacman thread to end
@@ -412,7 +391,6 @@ void* game_thread(void* arg) {  //1 2 3 4 5
             game_board->active = 0;   //stop other threads
             pthread_rwlock_unlock(&game_board->board_lock);
             
-            //pthread_join(game_board->ncursesTid, NULL);
             pthread_join(serverId, NULL);
             stop_ghost_threads(game_board);
             
@@ -466,7 +444,7 @@ int maxPoints(const void* a, const void* b) {
 
 
 
-int leaderBoard(session_t** activeClients, int maxGames, pthread_mutex_t* lock){ // clients connected array
+int leaderBoard(session_t** activeClients, int maxGames, pthread_mutex_t* lock){ 
     debug("----GERANDO LEADERBOARD----");
     int count = 0;
     score temp[maxGames]; 
@@ -546,7 +524,7 @@ void* host_thread(void* arg) {
 
     if (unlink(server_pipe_path) != 0 && errno != ENOENT) return NULL;
     if (mkfifo(server_pipe_path, 0640) != 0) return NULL; //cria o pipe do servidor
-    servfd = open(server_pipe_path, O_RDWR);  //MUDEI PARA RDWR PARA NÃO BLOQUEAR
+    servfd = open(server_pipe_path, O_RDWR);  
     if (servfd < 0) return NULL;
 
     while(!shutdown) {  
@@ -558,7 +536,7 @@ void* host_thread(void* arg) {
             if(shutdown) break;
             continue;
         }
-        if(buf[0] != OP_CODE_CONNECT) continue; //error
+        if(buf[0] != OP_CODE_CONNECT) continue; 
 
         client_request_t *request = malloc(sizeof(client_request_t));
         strncpy(request->req_pipe_path, buf + 1, 40);
@@ -567,11 +545,8 @@ void* host_thread(void* arg) {
         request->notif_pipe_path[39] = '\0';
         request->id = getId(buf + 1, 40);
 
-        //pthread_mutex_lock(lock);
-        //request->slot = freeClientSlot(maxGames, activeClients); //index no array de todos os clients
-        //pthread_mutex_unlock(lock);
 
-        pthread_mutex_lock(&producerConsumer->lock);     //escrever dados no produtor consumidor
+        pthread_mutex_lock(&producerConsumer->lock);     //escrever dados
         enqueue_p2c(producerConsumer, request);
         pthread_mutex_unlock(&producerConsumer->lock);
 
@@ -621,17 +596,17 @@ int main(int argc, char** argv) {
         exit(EXIT_FAILURE);
     }
 
-    signal(SIGPIPE, SIG_IGN); //caso o cliente feche a ligação, não dá erro quando tentamos escrever para lá 
+    signal(SIGPIPE, SIG_IGN); //caso o cliente feche a ligação evita o erro 
     struct sigaction sa;
     sa.sa_handler = handle_shutdown;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0; // Ajuda a que o read() não morra com erro
+    sa.sa_flags = 0; 
     sigaction(SIGINT, &sa, NULL); 
     
     struct sigaction sa2;
     sa2.sa_handler = handle_SIGUSR1;
     sigemptyset(&sa2.sa_mask);
-    sa2.sa_flags = 0; // Ajuda a que o read() não morra com erro
+    sa2.sa_flags = 0; 
     sigaction(SIGUSR1, &sa2, NULL); 
     
     // Random seed for any random movements
@@ -686,14 +661,14 @@ int main(int argc, char** argv) {
     }
     
     
-    free(gameTids);//organizar melhor isto
+    free(gameTids);
     unload_allLevels(levels);
 
     sem_destroy(sem_games);
     free(sem_games);
     
     pthread_mutex_destroy(&p2c->lock);
-    destroy_p2c(p2c); //liberta ponteiro "interior"
+    destroy_p2c(p2c); 
     free(p2c);
     
     free(activeClients);

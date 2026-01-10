@@ -12,7 +12,6 @@
 
 
 int write_all(int fd, char *buf, size_t len) {
-  //talvez tenhamos que por uma lock aqui se vários threads escreverem no mesmo pipe
   const char *p = (const char *)buf;
   size_t written = 0;
   while (written < len) {
@@ -30,7 +29,7 @@ int read_all(int fd, char *buf, size_t len) {
   size_t got = 0;
   while (got < len) {
     ssize_t ret = read(fd, p + got, len - got);
-    if (ret == 0) return -1;              // EOF before full message
+    if (ret == 0) return -1;             
     if (ret < 0) {
       
       return -1;
@@ -40,7 +39,7 @@ int read_all(int fd, char *buf, size_t len) {
   return 0;
 }
 
-void innit_session(session_t * session, int sessionId) {  //talvez returnar int para erro
+void innit_session(session_t * session, int sessionId) { 
   char msg[2];
   debug("%s\n", session->req_pipe_path);
   debug("%s\n", session->notif_pipe_path);
@@ -65,10 +64,8 @@ void innit_session(session_t * session, int sessionId) {  //talvez returnar int 
   }
 
   session->id = sessionId;
-  /* char buf[12]; 
-  int len = snprintf(buf, sizeof(buf), "%d\n", sessionId);
-  write(1, buf, len); */
-  return;    //fechamos os pipes no final
+
+  return;    
 }
 
 char get_pacman_command(session_t* session) {
