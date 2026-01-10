@@ -467,7 +467,7 @@ int leaderBoard(session_t** activeClients, int maxGames, pthread_mutex_t* lock){
         return 1;
     }
     
-    for(int id = 0; id < count; id ++){
+    for(int id = 0; id < 5; id ++){
         char buf[30]; 
         int len = snprintf(buf, 30, "%d - %d points\n", temp[id].id, temp[id].points);
         if(write(fd_leaderboard, buf, len) < 0){
