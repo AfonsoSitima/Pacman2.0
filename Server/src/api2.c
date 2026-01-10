@@ -1,7 +1,6 @@
 #include "api2.h"
 #include "board.h"
 #include "protocol2.h"
-#include "game.h"
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
@@ -10,7 +9,6 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <signal.h>
-
 
 
 int write_all(int fd, char *buf, size_t len) {
