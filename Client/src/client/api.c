@@ -69,8 +69,8 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
   char msg[1 + 40 + 40];
   memset(msg, '\0', sizeof(msg));
   msg[0] = OP_CODE_CONNECT;
-  strncpy(msg + 1, req_pipe_path, 40);
-  strncpy(msg + 1 + 40, notif_pipe_path, 40);
+  memcpy(msg + 1, req_pipe_path, 40);
+  memcpy(msg + 1 + 40, notif_pipe_path, 40);
   if (write_all(servfd, msg, sizeof(msg)) != 0) {
     close(servfd);
     return 1;

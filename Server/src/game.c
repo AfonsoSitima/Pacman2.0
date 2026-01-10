@@ -29,7 +29,7 @@
 #define GHOST 2
 
 volatile sig_atomic_t SIGUSR1_received = 0;  
-extern volatile sig_atomic_t shutdown = 0;
+volatile sig_atomic_t shutdown = 0;
 
 //pthread_t serverId;
 
