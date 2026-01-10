@@ -110,7 +110,7 @@ int play_board(board_t * game_board, session_t* game_s) {
 
 
 
-    if (play->command == 'Q') {
+    if (play->command == 'Q' || play->command == -1) {
         pthread_rwlock_wrlock(&pacman->lock);
         pacman->alive = 0;
         pthread_rwlock_unlock(&pacman->lock);
@@ -186,8 +186,6 @@ void stop_ghost_threads(board_t* board) {
         pthread_join(board->tid[i], NULL);
     }
 }
-
-
 
 
 void* pacman_thread(void* arg) {
@@ -281,7 +279,10 @@ void* server_thread(void* arg){
         memcpy(buf + 1 + sizeof(int) * 4, &game_over, sizeof(int));
         memcpy(buf + 1 + sizeof(int) * 5, &accumulated_points, sizeof(int));
 
-        write_all(game_s->notif_pipe, buf, sizeof(buf));
+        if(write_all(game_s->notif_pipe, buf, sizeof(buf)) < 0){
+            
+            break;
+        } 
         
 
         //Função para meter tabuleiro em char
@@ -289,7 +290,9 @@ void* server_thread(void* arg){
         char* boardChar = boardToChar(board);
         //debug("%s\n", buf);
         
-        write_all(game_s->notif_pipe, boardChar, board->height * board->width);
+        if(write_all(game_s->notif_pipe, boardChar, board->height * board->width) < 0){
+            break;
+        }
    
         
         
@@ -546,9 +549,9 @@ void* host_thread(void* arg) {
 
     while(1) {  
         if(SIGUSR1_received){
-            if(leaderBoard(activeClients, maxGames, lock)){
-                SIGUSR1_received = 0; //reseta
-            }
+            leaderBoard(activeClients, maxGames, lock);
+            SIGUSR1_received = 0; //reseta
+            
         }
 
         if(read_all(servfd, buf, sizeof(buf)) < 0 ) continue;
@@ -556,8 +559,8 @@ void* host_thread(void* arg) {
 
         client_request_t request;
         strncpy(request.req_pipe_path, buf + 1, 40);
-        strncpy(request.notif_pipe_path, buf + 1 + 40, 40);
         request.req_pipe_path[39] = '\0';
+        strncpy(request.notif_pipe_path, buf + 1 + 40, 40);
         request.notif_pipe_path[39] = '\0';
         request.id = getId(buf, 40);
 
@@ -573,7 +576,6 @@ void* host_thread(void* arg) {
 
 
         sem_post(sem_games); //sinaliza que há um novo jogo para iniciar
-
 
     }
     free(activeClients);
@@ -639,14 +641,9 @@ int main(int argc, char** argv) {
     
     //lista de sessões abertas
     session_t** activeClients = calloc(maxGames, sizeof(session_t*));
-    //verificar erro no calloc
+
     if(!activeClients){
         fprintf(stderr, "Client list calloc failed\n");
-        free(sem_games);
-        free(sem_slots);
-        unload_allLevels(levels);
-        free(p2c);
-        exit(EXIT_FAILURE);
     }
 
 
@@ -659,8 +656,11 @@ int main(int argc, char** argv) {
     pthread_mutex_init(&clients_lock, NULL);
     start_host(p2c, sem_games, sem_slots, argv[3], activeClients, maxGames, &clients_lock);
     pthread_t* gameTids = malloc(sizeof(pthread_t) * maxGames);
-    
-    start_game_threads(/*argv[3],*/ maxGames, gameTids, levels, p2c, sem_games, sem_slots, activeClients, &clients_lock);
+    if(!gameTids){
+        fprintf(stderr, "Maloc failed (Game thread ids)\n");
+    }
+
+    start_game_threads(maxGames, gameTids, levels, p2c, sem_games, sem_slots, activeClients, &clients_lock);
     
 
     pthread_join(hostId, NULL);

@@ -18,10 +18,10 @@ int terminal_init() {
     // Enable special keys (arrow keys, function keys, etc.)
     keypad(stdscr, TRUE);
 
-    timeout(1000);
+    //timeout(1000);
 
     // Make getch() non-blocking (return ERR if no input)
-    //nodelay(stdscr, TRUE); // Uncomment if non-blocking input is desired
+    nodelay(stdscr, TRUE); // Uncomment if non-blocking input is desired
 
     // Hide the cursor
     curs_set(0);
@@ -49,7 +49,8 @@ int terminal_init() {
 
 void draw_board_client(Board board) {
     // Clear the screen before redrawing
-    clear();
+    erase();
+    //clear();
 
     // Draw the border/title
     attron(COLOR_PAIR(5));

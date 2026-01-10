@@ -11,6 +11,8 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <signal.h>
+
 
 Board board;
 bool stop_execution = false;
@@ -19,21 +21,27 @@ pthread_rwlock_t temp_lock = PTHREAD_RWLOCK_INITIALIZER;
 pthread_mutex_t ready_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_rwlock_t execution = PTHREAD_RWLOCK_INITIALIZER;
 
+volatile sig_atomic_t SIGINT_received = 0; 
 
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t ncurses = PTHREAD_MUTEX_INITIALIZER;
 bool board_ready = false;
 
 static void *receiver_thread(void *arg) {
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGINT);   
+    pthread_sigmask(SIG_BLOCK, &set, NULL); 
+
     (void)arg;
 
     while (true) {
         if(board.data){
             free(board.data);
         }
-            board = receive_board_update();
-
-        if (!board.data || board.game_over == 1 || board.victory == 1) {
+        board = receive_board_update();
+        
+        if (!board.data || board.game_over == 1 || board.victory == 1 || SIGINT_received == 1) {
             debug("Game over received, stopping receiver thread...\n");
             pthread_rwlock_wrlock(&execution);
             stop_execution = true;
@@ -69,7 +77,17 @@ static void *receiver_thread(void *arg) {
     return NULL;
 }
 
+void handle_SIGINT(){
+
+    SIGINT_received = 1;
+}
+
 int main(int argc, char *argv[]) {
+    struct sigaction sa2;
+    sa2.sa_handler = handle_SIGINT;
+    sigemptyset(&sa2.sa_mask);
+    sa2.sa_flags = 0; 
+    sigaction(SIGINT, &sa2, NULL); 
     if (argc != 3 && argc != 4) {
         fprintf(stderr,
             "Usage: %s <client_id> <register_pipe> [commands_file]\n",
@@ -108,7 +126,7 @@ int main(int argc, char *argv[]) {
     }
 
     terminal_init();
-    set_timeout(500);
+    //set_timeout(500);
 
     pthread_t receiver_thread_id;
     pthread_create(&receiver_thread_id, NULL, receiver_thread, NULL);
@@ -158,6 +176,9 @@ int main(int argc, char *argv[]) {
             pthread_mutex_lock(&ncurses);
             command = get_input();
             pthread_mutex_unlock(&ncurses);
+            if(SIGINT_received){
+                break;
+            }
             command = toupper(command);
         }
         pthread_rwlock_rdlock(&temp_lock);
@@ -169,9 +190,12 @@ int main(int argc, char *argv[]) {
         debug("wait_for2 : %d\n", wait_for);
 
         debug("Command: %c\n", command);
-
-        pacman_play(command);
-
+        if(SIGINT_received){
+            pacman_play(-1);
+        }
+        else{
+            pacman_play(command);
+        }
     }
 
     debug("Waiting for receiver thread to finish...\n");
@@ -181,7 +205,7 @@ int main(int argc, char *argv[]) {
     debug("Disconnecting from server...\n");
 
     pacman_disconnect();
-
+    debug("DESCONECTOU\n");
     sleep_ms(1000);
     debug("Exiting main...\n");
     close_debug_file();

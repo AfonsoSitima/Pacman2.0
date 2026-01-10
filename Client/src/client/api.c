@@ -115,17 +115,17 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
   return (resp[1] == 0) ? 0 : 1;
 }
 
-void pacman_play(char command) {
+int pacman_play(char command) {
   char buf[2];
   buf[0] = OP_CODE_PLAY;
   buf[1] = command;
-  if(write_all(session.req_pipe, buf, 2) != 0) {
+  if(write_all(session.req_pipe, buf, 2) < 0) {
     //error
     //return -1
+    return -1;
   }
-  //return 0;
-  //no enunciado diz para retornar int
-  //o enunciado tá todo fodido em comparacao ao codigo base
+  return 0;
+
 
 }
 
@@ -153,6 +153,8 @@ Board receive_board_update(void) {
   
   if (read_all(session.notif_pipe, buf, 1 + (sizeof(int) * 6)) != 0) {
     //error
+    board.data = NULL;
+    return board; //se for null podemos tratar erro
   }
     memcpy(&width, buf + 1, sizeof(int));
     memcpy(&height, buf + 1 + sizeof(int),    sizeof(int));
@@ -161,7 +163,8 @@ Board receive_board_update(void) {
     memcpy(&game_over, buf + 1 + sizeof(int) * 4, sizeof(int));
     memcpy(&accumulated_points, buf + 1 + sizeof(int) * 5, sizeof(int));
   if (buf[0] != OP_CODE_BOARD) {
-    //error
+    board.data = NULL;
+    return board;
   }
 
   board.data = malloc((width * height) * sizeof(char));

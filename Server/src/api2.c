@@ -76,7 +76,7 @@ char get_pacman_command(session_t* session) {
   if (reqfd < 0) return '\0';
   char command[2];
   if (read_all(reqfd, command, sizeof(command)) != 0) {
-      return '\0';
+      return -1;
   }
   debug("Comando recebido : %c\n", command[1]);
   return command[1];
