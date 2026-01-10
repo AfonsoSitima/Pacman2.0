@@ -340,10 +340,10 @@ void* game_thread(void* arg) {  //1 2 3 4 5
     char notif_file_path[40];
     while(1){
         sem_wait(sem_games); //espera por um novo jogo para iniciar
-        if(shutdown) break;
+        //if(shutdown) break;
         pthread_mutex_lock(&producerConsumer->lock);     //ler dados do produtor consumidor
         client_request_t* request = pop_p2c(producerConsumer);
-        if (!request) {
+        if (!request ) {
             pthread_mutex_unlock(&producerConsumer->lock);
             break; // No request to process
         }
@@ -355,11 +355,13 @@ void* game_thread(void* arg) {  //1 2 3 4 5
 
         pthread_mutex_unlock(&producerConsumer->lock);
 
-        if (shutdown) {
+        if (shutdown == 1) {
             char msg[2];
             msg[0] = OP_CODE_CONNECT;
             msg[1] = -1; //server is shutting down
-            write_all(notif_file_path, msg, 2);
+            int fd = open(notif_file_path, O_WRONLY);
+            write_all(fd, msg, 2);
+            close(fd);
             continue;
         }
 
@@ -695,6 +697,7 @@ int main(int argc, char** argv) {
     free(p2c);
     
     free(activeClients);
+    close_debug_file();
     
     return 0;
 }

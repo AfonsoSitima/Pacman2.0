@@ -71,8 +71,8 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
   char msg[1 + 40 + 40];
   memset(msg, '\0', sizeof(msg));
   msg[0] = OP_CODE_CONNECT;
-  strncpy(msg + 1, req_pipe_path, 40);
-  strncpy(msg + 1 + 40, notif_pipe_path, 40);
+  memcpy(msg + 1, req_pipe_path, 40);
+  memcpy(msg + 1 + 40, notif_pipe_path, 40);
   if (write_all(servfd, msg, sizeof(msg)) != 0) {
     close(servfd);
     return 1;
@@ -97,7 +97,7 @@ int pacman_connect(char const *req_pipe_path, char const *notif_pipe_path, char 
     session.notif_pipe = -1;
     return 1;
   }
-  if (resp[1] != -1) {
+  if (resp[1] == -1) {
     // Connection rejected by server
     close(session.notif_pipe);
     session.notif_pipe = -1;

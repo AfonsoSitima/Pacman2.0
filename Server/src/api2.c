@@ -82,14 +82,10 @@ char get_pacman_command(session_t* session) {
   return command[1];
 }
 
-void disconnect_session(session_t* session) {
+void disconnect_session(session_t* s) {
   char op_code[1];
-  read_all(session->req_pipe, op_code, 1);
-  if (op_code[0] != OP_CODE_DISCONNECT) {
-      //error
-      return;
-  }
-  close(session->req_pipe);
-  close(session->notif_pipe);
-  free(session);
+  read_all(s->req_pipe, op_code, 1);
+  if (s->req_pipe >= 0)  { close(s->req_pipe);  s->req_pipe = -1; }
+  if (s->notif_pipe >= 0){ close(s->notif_pipe);s->notif_pipe = -1; }
+  free(s);
 }
